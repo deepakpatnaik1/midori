@@ -1,0 +1,14 @@
+# Xcode
+build/
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.swiftpm/
+.build/
+FluidAudio-Local/
