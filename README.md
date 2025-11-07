@@ -12,51 +12,69 @@ Press Right Command to record. Release to transcribe. Text appears at your curso
 
 - 🎤 **Voice Recording** - Hold Right Command key to record
 - 🌊 **Visual Feedback** - Animated waveform with purple-to-cyan gradient
-- ✨ **Instant Transcription** - Powered by Whisper AI
+- ✨ **Real-time Transcription** - Powered by NVIDIA Parakeet V2
 - 📝 **Smart Injection** - Text appears at your cursor in any app
 - 🎯 **Menu Bar Native** - Always available, never intrusive
+- 🚀 **Auto-launch** - Starts automatically at login
 - ⚡️ **Zero Friction** - No clicking, no windows, no distractions
 
 ## Quick Start
 
-### Run the App
-```bash
-./scripts/run.sh
-```
+### For End Users
+
+1. Download `Midori-Installer.dmg`
+2. Double-click to mount the DMG
+3. Drag `Midori.app` to the `Applications` folder
+4. Launch Midori from Applications or Spotlight (⌘+Space → "Midori")
+5. Grant permissions when prompted:
+   - **Microphone**: Click "OK" when prompted
+   - **Accessibility**: System Settings → Privacy & Security → Accessibility → Enable Midori
 
 ### Use It
+
 1. Press and **hold** Right Command key (⌘)
-2. Wait 1 second (you'll hear a pop sound)
+2. Wait for the pop sound
 3. Speak your message while watching the animated waveform
 4. **Release** Right Command when done
-5. Watch pulsing dots while transcribing
-6. Your text appears at the cursor!
+5. Watch the transcription appear at your cursor!
 
 ## Project Status
 
-**Development**: ✅ Complete
-**Production Ready**: 🚧 Needs whisper.cpp integration
+**Status**: ✅ **PRODUCTION READY**
 
-### What Works Now (Development Mode)
-- ✅ Menu bar app with status icon
+### Completed Features
+- ✅ Menu bar app with waveform icon
 - ✅ Right Command key detection
-- ✅ Animated waveform visualization
-- ✅ User feedback sequence (pop sound, pulsing dots)
-- ✅ Mock transcription (returns test phrases)
-- ✅ Text injection simulation
+- ✅ Real audio recording with AVAudioEngine
+- ✅ Animated 9-bar waveform visualization
+- ✅ Pop sound feedback
+- ✅ Real transcription with NVIDIA Parakeet V2
+- ✅ Text injection at cursor position
+- ✅ Auto-launch at login
+- ✅ Custom app icon (gradient waveform)
+- ✅ Production DMG installer
 
-### What's Next (Production)
-- 🚧 Real whisper.cpp transcription
-- 🚧 Real audio recording (code ready, needs testing)
-- 🚧 Accessibility permission for text injection
+## Installation for Development
 
-See [TODO.md](TODO.md) for full production checklist.
+### Build and Install Locally
+```bash
+./scripts/install-local.sh
+```
+
+This installs to `~/.local/midori/midori.app` for stable permissions.
+
+### Create Production DMG
+```bash
+./scripts/package-dmg.sh
+```
+
+This creates `release/Midori-Installer.dmg` ready for distribution.
 
 ## Documentation
 
+- **[PRODUCTION.md](PRODUCTION.md)** - Production build and distribution
 - **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - How to test the app
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Technical details
-- **[TODO.md](TODO.md)** - Production roadmap
 - **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Current status
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Command cheat sheet
 
@@ -65,9 +83,9 @@ See [TODO.md](TODO.md) for full production checklist.
 ```
 Menu Bar App
     ├── KeyMonitor (NSEvent) → Right Command detection
-    ├── AudioRecorder (AVAudioEngine) → Audio capture
-    ├── WaveformWindow (SwiftUI) → 9-bar visualization
-    └── TranscriptionManager (whisper.cpp) → AI transcription
+    ├── AudioRecorder (AVAudioEngine) → Real audio capture
+    ├── WaveformWindow (SwiftUI) → 9-bar gradient visualization
+    └── TranscriptionManager (FluidAudio/Parakeet) → AI transcription
 ```
 
 Clean separation of concerns with callback-based communication.
@@ -76,24 +94,21 @@ Clean separation of concerns with callback-based communication.
 
 ### Build System
 ```bash
-# Verify configuration
+# Install locally for development
+./scripts/install-local.sh
+
+# Create production DMG
+./scripts/package-dmg.sh
+
+# Verify setup
 ./scripts/verify-setup.sh
-
-# Build only
-./scripts/build.sh
-
-# Build and run
-./scripts/run.sh
-
-# Reset permissions (if needed)
-./scripts/reset-permissions.sh
 ```
 
 ### Key Features
 - **Fixed build location** - `build/Build/Products/Debug/midori.app`
 - **No permission resets** - Same path = persistent permissions
-- **Debug-only scheme** - Fast iteration with `-Onone`
-- **Mock data pattern** - Test without permissions during dev
+- **Debug configuration** - Release optimizations break audio/transcription
+- **Local package** - FluidAudio integrated via local Swift package
 
 ### Open in Xcode
 ```bash
@@ -101,15 +116,15 @@ open midori.xcodeproj
 ```
 
 Select `Midori-Debug` scheme and press Cmd+R to run.
-Press Cmd+Shift+Y to see console output.
 
 ## Requirements
 
-- macOS 15.6+
+- macOS 14.0+
 - Xcode 16.1+
 - Swift 5.0+
+- Apple Silicon (arm64) or Intel (x86_64)
 
-### Permissions (for production)
+### Required Permissions
 - **Microphone** - To record your voice
 - **Accessibility** - To paste text at cursor
 
@@ -122,19 +137,20 @@ Press Cmd+Shift+Y to see console output.
 - No configuration needed
 - Just press, speak, release
 
-**Development philosophy**:
-- Mock data during development (avoid permission dialogs)
-- Real implementation ready but gated
-- Full workflow testable end-to-end
-- Zero-friction debugging
+**Technical philosophy**:
+- Real audio recording with AVAudioEngine
+- State-of-the-art transcription with Parakeet V2
+- Native macOS integration (menu bar, key monitoring)
+- Zero-friction user experience
 
 ## Technical Highlights
 
-- **NSEvent-based key monitoring** - No accessibility permissions during dev
+- **NSEvent-based key monitoring** - Global Right Command detection
 - **SwiftUI + AppKit hybrid** - Best of both worlds
 - **Callback architecture** - Clean, testable, maintainable
 - **ObservableObject pattern** - Reactive UI updates
-- **Fixed build location** - No more permission resets!
+- **FluidAudio package** - NVIDIA Parakeet V2 transcription
+- **Fixed build location** - Stable permissions
 
 ## File Structure
 
@@ -146,34 +162,55 @@ midori/
 │   ├── AudioRecorder.swift      # Audio capture
 │   ├── TranscriptionManager.swift # AI transcription
 │   ├── WaveformView.swift       # 9-bar visualization
-│   └── WaveformWindow.swift     # Floating window
-├── scripts/                     # Automation scripts
+│   ├── WaveformWindow.swift     # Floating window
+│   └── ContentView.swift        # (unused)
+├── FluidAudio-Local/            # Local Swift package
+├── scripts/                     # Build & install scripts
 ├── docs/                        # Requirements & guidelines
-└── build/                       # Built app (gitignored)
+├── build/                       # Built app (gitignored)
+└── release/                     # Production DMG
 ```
 
-## Contributing
+## Distribution
 
-This is a personal project, but feedback and suggestions are welcome!
+The app is distributed as a DMG installer:
+- **File**: `release/Midori-Installer.dmg`
+- **Size**: ~17 MB
+- **Configuration**: Debug (Release optimizations break functionality)
+- **Contents**: App + Instructions + Applications symlink
+
+Recipients just need to:
+1. Double-click the DMG
+2. Drag to Applications
+3. Grant permissions on first launch
+
+## Known Limitations
+
+- **Debug build required**: Swift Release optimizations break audio/transcription functionality
+- **Manual permissions**: macOS requires users to manually grant Accessibility and Microphone permissions
+- **Apple Silicon optimized**: Primarily tested on Apple Silicon Macs
 
 ## Roadmap
 
 - [x] Menu bar app infrastructure
 - [x] Right Command key monitoring
 - [x] Waveform visualization
-- [x] User feedback sequence
-- [x] Mock transcription
-- [ ] whisper.cpp integration
-- [ ] Real audio recording
+- [x] Pop sound feedback
+- [x] Real audio recording
+- [x] Real transcription (Parakeet V2)
+- [x] Text injection at cursor
+- [x] Auto-launch at login
+- [x] Custom app icon
+- [x] Production DMG installer
+- [ ] Permission setup helper UI
 - [ ] Model management UI
-- [ ] Auto-launch at login
-- [ ] Custom app icon
 - [ ] Preferences window
+- [ ] Custom keyboard shortcuts
 
 ## Credits
 
-- **Whisper AI** by OpenAI - Speech recognition
-- **whisper.cpp** by Georgi Gerganov - C++ implementation
+- **NVIDIA Parakeet V2** - Speech recognition model
+- **FluidAudio** - Audio processing and transcription library
 - **Design** inspired by minimal, functional macOS tools
 
 ## License

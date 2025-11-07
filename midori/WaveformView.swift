@@ -37,7 +37,7 @@ struct WaveformView: View {
                             endPoint: .bottom
                         )
                     )
-                    .frame(width: 8, height: barHeights[index] * 50)
+                    .frame(width: 8, height: barHeights[index] * 35)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: barHeights[index])
             }
         }
@@ -78,33 +78,40 @@ struct WaveformView: View {
     private func updateBarHeights() {
         let currentTime = Date().timeIntervalSince1970
 
-        // Audio level determines dancing intensity
+        // Audio level determines dancing intensity - BOOSTED for more wild movement
         let intensity = CGFloat(audioLevel)
 
+        // Amplify the intensity for more sensitivity
+        let amplifiedIntensity = min(intensity * 3.5, 1.0)  // 3.5x more sensitive!
+
         // When silent (low audio), bars become more stable
-        let stabilityFactor: CGFloat = intensity < 0.1 ? 0.05 : intensity
+        let stabilityFactor: CGFloat = intensity < 0.1 ? 0.05 : amplifiedIntensity
 
         for i in 0..<9 {
-            // Each bar has its own frequency and phase for independent movement
-            let frequency = 2.0 + Double(i) * 0.3  // Different frequency per bar
+            // Each bar has its own frequency and phase - INCREASED for faster dancing
+            let frequency = 4.0 + Double(i) * 0.6  // Even faster base frequency
             let phase = barPhases[i]
 
             // Create dancing motion using sine waves with individual characteristics
             let baseMotion = sin(currentTime * frequency + phase)
 
-            // Add secondary motion for more complex animation
-            let secondaryFrequency = 3.0 + Double(i) * 0.2
-            let secondaryMotion = sin(currentTime * secondaryFrequency + phase * 1.5) * 0.3
+            // Add secondary motion for more complex animation - STRONGER secondary motion
+            let secondaryFrequency = 6.0 + Double(i) * 0.5
+            let secondaryMotion = sin(currentTime * secondaryFrequency + phase * 1.5) * 0.5  // Doubled from 0.3 to 0.5
 
-            // Combine motions and apply intensity
-            let combinedMotion = (baseMotion + secondaryMotion) * Double(stabilityFactor)
+            // Add third wave for even more chaotic movement
+            let tertiaryFrequency = 9.0 + Double(i) * 0.4
+            let tertiaryMotion = sin(currentTime * tertiaryFrequency + phase * 2.0) * 0.5  // Increased from 0.3 to 0.5
 
-            // Calculate final height (0.4 to 1.0 range for nice visual)
+            // Combine all three motions and apply intensity
+            let combinedMotion = (baseMotion + secondaryMotion + tertiaryMotion) * Double(stabilityFactor)
+
+            // Calculate final height with WIDER range for more dramatic movement
             // When silent: bars hover around 0.7 with minimal movement
-            // When speaking: bars dance between 0.4 and 1.0
-            let minHeight: CGFloat = intensity < 0.1 ? 0.65 : 0.4
-            let maxHeight: CGFloat = intensity < 0.1 ? 0.75 : 1.0
-            let normalizedHeight = (CGFloat(combinedMotion) + 1.0) / 2.0  // 0 to 1
+            // When speaking: bars dance wildly between 0.15 and 1.5 (EXTREME range!)
+            let minHeight: CGFloat = intensity < 0.1 ? 0.65 : 0.15  // Even lower minimum
+            let maxHeight: CGFloat = intensity < 0.1 ? 0.75 : 1.5  // Even higher maximum
+            let normalizedHeight = (CGFloat(combinedMotion) + 1.5) / 3.0  // Adjusted normalization
 
             barHeights[i] = minHeight + (normalizedHeight * (maxHeight - minHeight))
         }
