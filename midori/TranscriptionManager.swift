@@ -104,7 +104,7 @@ class TranscriptionManager {
             // Transcribe using FluidAudio
             let result = try await manager.transcribe(samples)
 
-            print("✓ Parakeet transcription complete: \(result.text)")
+            print("✓ Parakeet transcription complete: [REDACTED - \(result.text.count) characters]")
 
             DispatchQueue.main.async {
                 completion(.success(result.text))

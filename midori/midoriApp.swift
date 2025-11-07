@@ -228,7 +228,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     DispatchQueue.main.async {
                         switch result {
                         case .success(let text):
-                            print("✓ Transcription complete: \(text)")
+                            print("✓ Transcription complete: [REDACTED - \(text.count) characters]")
                             self?.injectText(text)
                         case .failure(let error):
                             print("❌ Transcription failed: \(error.localizedDescription)")
@@ -248,7 +248,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         if !trusted {
             print("⚠️ Accessibility not granted")
-            print("📋 Transcribed text: \(text)")
+            print("📋 Transcribed text: [REDACTED - \(text.count) characters]")
             showError("Accessibility permission required to paste text. Please grant in System Settings.\n\nTranscribed: \(text)")
             return
         }
@@ -256,7 +256,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Add a space after the text for proper sentence separation
         let textWithSpace = text + " "
 
-        print("📋 Setting pasteboard: \"\(textWithSpace)\" (\(textWithSpace.count) chars)")
+        print("📋 Setting pasteboard: [REDACTED - \(textWithSpace.count) characters]")
 
         // Inject text using pasteboard and Cmd+V simulation
         let pasteboard = NSPasteboard.general
@@ -266,9 +266,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pasteboard.setString(textWithSpace, forType: .string)
 
         // Verify pasteboard was set correctly
-        let pasteboardText = pasteboard.string(forType: .string)
         print("✓ Pasteboard set (change count: \(changeCount) -> \(pasteboard.changeCount))")
-        print("✓ Pasteboard contains: \"\(pasteboardText ?? "nil")\"")
+        print("✓ Pasteboard ready for paste")
 
         // Wait for pasteboard to be fully updated
         Thread.sleep(forTimeInterval: 0.1)
