@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import ServiceManagement
+import AudioToolbox
 
 @main
 struct midoriApp: App {
@@ -26,6 +27,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var audioRecorder: AudioRecorder?
     var waveformWindow: WaveformWindow?
     var transcriptionManager: TranscriptionManager?
+
+    // Keep strong references to sound objects to prevent deallocation
+    var popSound1: NSSound?
+    var popSound2: NSSound?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("✓ Midori launching...")
@@ -96,26 +101,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func startRecording() {
         // Wait 1 second before showing waveform and playing pop sound
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            // Play pop sound - MULTIPLE TIMES for EXTRA LOUD effect
-            if let sound = NSSound(named: "Pop") {
-                sound.volume = 1.0  // Maximum volume!
-                sound.play()
-                // Play it again immediately for double volume effect
-                if let sound2 = NSSound(named: "Pop") {
+            guard let self = self else { return }
+
+            // Create sound objects and keep strong references to prevent deallocation
+            self.popSound1 = NSSound(named: "Pop")
+            self.popSound2 = NSSound(named: "Pop")
+
+            if let sound1 = self.popSound1 {
+                sound1.volume = 1.0
+                sound1.play()
+                print("🔊 Pop sound 1 played")
+            } else {
+                print("⚠️ Pop sound not available")
+            }
+
+            // Play second pop with delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                if let sound2 = self.popSound2 {
                     sound2.volume = 1.0
                     sound2.play()
+                    print("🔊 Pop sound 2 played")
                 }
-                print("🔊🔊 Pop sound played (EXTRA LOUD - 2x)")
-            } else {
-                NSSound.beep()
-                print("🔊 Beep sound played (Pop not available)")
             }
 
             // Show waveform window
-            self?.waveformWindow?.show()
+            self.waveformWindow?.show()
 
             // Start audio recording
-            self?.audioRecorder?.startRecording()
+            self.audioRecorder?.startRecording()
         }
     }
 
