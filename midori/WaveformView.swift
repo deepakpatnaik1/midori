@@ -3,7 +3,7 @@
 //  midori
 //
 //  Dancing 9-bar waveform visualization with purple-to-cyan gradient
-//  Bars start at uniform height and dance independently based on audio level
+//  Bars start as small circles and grow into dancing bars based on audio level
 //
 
 import SwiftUI
@@ -11,32 +11,34 @@ import SwiftUI
 struct WaveformView: View {
     @Binding var audioLevel: Float
 
-    // Individual bar heights - all start uniform
-    @State private var barHeights: [CGFloat] = Array(repeating: 1.0, count: 9)
+    // Individual bar heights - start as tiny circles
+    @State private var barHeights: [CGFloat] = Array(repeating: 0.23, count: 9)
 
     // Individual animation timers for each bar
     @State private var barPhases: [Double] = Array(repeating: 0.0, count: 9)
     @State private var timer: Timer?
 
-    // Purple to cyan gradient colors (matching voice.png)
-    let gradientColors = [
-        Color(red: 1.0, green: 0.0, blue: 1.0),   // Magenta top
-        Color(red: 0.58, green: 0.29, blue: 0.82), // Purple middle
-        Color(red: 0.29, green: 0.71, blue: 0.91), // Blue
-        Color(red: 0.0, green: 1.0, blue: 1.0)     // Cyan bottom
+    // Each bar has its own personality - fixed max height for consistency
+    @State private var barMaxHeights: [CGFloat] = []
+
+    // Vivid colors for each circle/bar (left to right gradient) - highly saturated!
+    let barColors: [Color] = [
+        Color(red: 1.0, green: 0.0, blue: 1.0),     // Hot Magenta (leftmost)
+        Color(red: 1.0, green: 0.1, blue: 0.95),    // Bright Pink
+        Color(red: 0.9, green: 0.2, blue: 1.0),     // Vivid Purple-Pink
+        Color(red: 0.7, green: 0.2, blue: 1.0),     // Electric Purple
+        Color(red: 0.5, green: 0.4, blue: 1.0),     // Purple-Blue (center)
+        Color(red: 0.3, green: 0.6, blue: 1.0),     // Bright Blue
+        Color(red: 0.2, green: 0.8, blue: 1.0),     // Sky Blue
+        Color(red: 0.0, green: 0.9, blue: 1.0),     // Electric Cyan
+        Color(red: 0.0, green: 1.0, blue: 1.0)      // Pure Cyan (rightmost)
     ]
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<9, id: \.self) { index in
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: gradientColors),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .fill(barColors[index])
                     .frame(width: 8, height: barHeights[index] * 35)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: barHeights[index])
             }
@@ -58,6 +60,10 @@ struct WaveformView: View {
         // Initialize random phases for each bar
         barPhases = (0..<9).map { _ in Double.random(in: 0...2 * .pi) }
 
+        // Give each bar its own fixed maximum height "personality"
+        // Some bars are tall, some medium, some short - but consistent
+        barMaxHeights = (0..<9).map { _ in CGFloat.random(in: 1.0...2.5) }
+
         // Start animation timer at 60fps
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
             updateBarHeights()
@@ -78,42 +84,51 @@ struct WaveformView: View {
     private func updateBarHeights() {
         let currentTime = Date().timeIntervalSince1970
 
-        // Audio level determines dancing intensity - BOOSTED for more wild movement
+        // Audio level determines dancing intensity
         let intensity = CGFloat(audioLevel)
 
-        // Amplify the intensity for more sensitivity
-        let amplifiedIntensity = min(intensity * 3.5, 1.0)  // 3.5x more sensitive!
+        // ULTRA sensitive amplification for very soft speaking
+        // Using exponential curve to boost low levels dramatically
+        let boostedIntensity = pow(intensity * 12.0, 0.65)  // Even more boost!
+        let amplifiedIntensity = min(boostedIntensity, 1.0)
 
-        // When silent (low audio), bars become more stable
-        let stabilityFactor: CGFloat = intensity < 0.1 ? 0.05 : amplifiedIntensity
+        // Ultra-low threshold for detecting very soft speech
+        let isSpeaking = intensity > 0.03
 
         for i in 0..<9 {
-            // Each bar has its own frequency and phase - INCREASED for faster dancing
-            let frequency = 4.0 + Double(i) * 0.6  // Even faster base frequency
-            let phase = barPhases[i]
+            if !isSpeaking {
+                // Keep as tiny circles when silent with slight variation
+                barHeights[i] = 0.22 + CGFloat.random(in: 0...0.02)
+            } else {
+                // Each bar dances with its own unique frequency
+                let frequency = 4.0 + Double(i) * 0.7
+                let phase = barPhases[i]
 
-            // Create dancing motion using sine waves with individual characteristics
-            let baseMotion = sin(currentTime * frequency + phase)
+                // Primary wave motion
+                let wave1 = sin(currentTime * frequency + phase)
 
-            // Add secondary motion for more complex animation - STRONGER secondary motion
-            let secondaryFrequency = 6.0 + Double(i) * 0.5
-            let secondaryMotion = sin(currentTime * secondaryFrequency + phase * 1.5) * 0.5  // Doubled from 0.3 to 0.5
+                // Secondary wave with different frequency
+                let wave2 = sin(currentTime * (frequency * 1.7) + phase * 2.1) * 0.5
 
-            // Add third wave for even more chaotic movement
-            let tertiaryFrequency = 9.0 + Double(i) * 0.4
-            let tertiaryMotion = sin(currentTime * tertiaryFrequency + phase * 2.0) * 0.5  // Increased from 0.3 to 0.5
+                // Tertiary wave for even more variety
+                let wave3 = sin(currentTime * (frequency * 2.3) + phase * 1.6) * 0.4
 
-            // Combine all three motions and apply intensity
-            let combinedMotion = (baseMotion + secondaryMotion + tertiaryMotion) * Double(stabilityFactor)
+                // Combine all waves
+                let combinedWave = wave1 + wave2 + wave3
 
-            // Calculate final height with WIDER range for more dramatic movement
-            // When silent: bars hover around 0.7 with minimal movement
-            // When speaking: bars dance wildly between 0.15 and 1.5 (EXTREME range!)
-            let minHeight: CGFloat = intensity < 0.1 ? 0.65 : 0.15  // Even lower minimum
-            let maxHeight: CGFloat = intensity < 0.1 ? 0.75 : 1.5  // Even higher maximum
-            let normalizedHeight = (CGFloat(combinedMotion) + 1.5) / 3.0  // Adjusted normalization
+                // Normalize to 0-1 range
+                let normalized = (combinedWave + 1.9) / 3.8
 
-            barHeights[i] = minHeight + (normalizedHeight * (maxHeight - minHeight))
+                // Use this bar's fixed maximum height personality
+                let thisBarMaxHeight = barMaxHeights.isEmpty ? 2.0 : barMaxHeights[i]
+                let minHeight: CGFloat = 0.25
+
+                // Calculate height - bar dances between min and its personal max
+                let targetHeight = minHeight + (CGFloat(normalized) * (thisBarMaxHeight - minHeight))
+
+                // Apply super-sensitive amplified intensity
+                barHeights[i] = targetHeight * amplifiedIntensity
+            }
         }
     }
 }
