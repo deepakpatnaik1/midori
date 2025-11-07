@@ -32,6 +32,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popSound1: NSSound?
     var popSound2: NSSound?
 
+    // Bulletproof state management
+    private var isRecording = false
+    private var recordingStartTimer: DispatchWorkItem?
+    private let stateQueue = DispatchQueue(label: "com.midori.stateQueue")
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("✓ Midori launching...")
 
@@ -90,17 +95,79 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleRightCommandKey(isPressed: Bool) {
         if isPressed {
-            print("🎤 Right Command pressed - Starting recording...")
-            startRecording()
+            print("🎤 Right Command pressed - Initiating recording...")
+            initiateRecording()
         } else {
-            print("🔴 Right Command released - Stopping recording...")
-            stopRecording()
+            print("🔴 Right Command released - Initiating stop...")
+            initiateStop()
+        }
+    }
+
+    private func initiateRecording() {
+        stateQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Cancel any pending start timer from previous presses
+            self.recordingStartTimer?.cancel()
+
+            // If already recording, ignore (handles double-tap)
+            guard !self.isRecording else {
+                print("⚠️ Already recording, ignoring duplicate press")
+                return
+            }
+
+            print("✓ Recording initiation accepted")
+
+            // Create cancellable timer for the 1-second delay
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                // Execute startRecording on the state queue to ensure thread safety
+                self.stateQueue.async {
+                    self.startRecording()
+                }
+            }
+
+            self.recordingStartTimer = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+        }
+    }
+
+    private func initiateStop() {
+        stateQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Cancel pending start timer if key released before 1 second
+            if let timer = self.recordingStartTimer {
+                timer.cancel()
+                self.recordingStartTimer = nil
+                print("⚠️ Key released before 1s - Recording cancelled")
+                return
+            }
+
+            // If not recording, nothing to stop
+            guard self.isRecording else {
+                print("⚠️ Not recording, ignoring release")
+                return
+            }
+
+            print("✓ Stop initiation accepted")
+            self.stopRecording()
         }
     }
 
     private func startRecording() {
-        // Wait 1 second before showing waveform and playing pop sound
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        // This method is called from within stateQueue.async, so state is already protected
+        guard !isRecording else {
+            print("⚠️ Already recording in startRecording, aborting")
+            return
+        }
+        isRecording = true
+        recordingStartTimer = nil  // Clear the timer reference
+
+        print("✅ Recording started")
+
+        // All UI and audio operations must happen on main thread
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
             // Create sound objects and keep strong references to prevent deallocation
@@ -116,8 +183,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             // Play second pop with delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                if let sound2 = self.popSound2 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                if let sound2 = self?.popSound2 {
                     sound2.volume = 1.0
                     sound2.play()
                     print("🔊 Pop sound 2 played")
@@ -133,26 +200,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func stopRecording() {
-        // Stop recording
-        audioRecorder?.stopRecording()
+        // This method is called from within stateQueue.async, so state is already protected
+        guard isRecording else {
+            print("⚠️ stopRecording called but wasn't recording")
+            return
+        }
 
-        // Hide waveform
-        waveformWindow?.hide()
+        isRecording = false
+        recordingStartTimer = nil  // Ensure timer is cleared
 
-        // Get audio data and transcribe
-        if let audioData = audioRecorder?.getAudioData() {
-            print("📝 Transcribing audio...")
-            transcriptionManager?.transcribe(audioData: audioData) { [weak self] result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let text):
-                        print("✓ Transcription complete: \(text)")
-                        self?.injectText(text)
-                    case .failure(let error):
-                        print("❌ Transcription failed: \(error.localizedDescription)")
-                        // Silent failure - no dialog box, just log it
+        print("✅ Recording stopped")
+
+        // All UI and audio operations must happen on main thread
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            // Stop recording
+            self.audioRecorder?.stopRecording()
+
+            // Hide waveform
+            self.waveformWindow?.hide()
+
+            // Get audio data and transcribe
+            if let audioData = self.audioRecorder?.getAudioData() {
+                print("📝 Transcribing audio...")
+                self.transcriptionManager?.transcribe(audioData: audioData) { [weak self] result in
+                    DispatchQueue.main.async {
+                        switch result {
+                        case .success(let text):
+                            print("✓ Transcription complete: \(text)")
+                            self?.injectText(text)
+                        case .failure(let error):
+                            print("❌ Transcription failed: \(error.localizedDescription)")
+                            // Silent failure - no dialog box, just log it
+                        }
                     }
                 }
+            } else {
+                print("⚠️ No audio data captured")
             }
         }
     }
