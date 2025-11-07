@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import ServiceManagement
 
 @main
 struct midoriApp: App {
@@ -32,6 +33,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hide dock icon (LSUIElement handles this, but ensure no window appears)
         NSApp.setActivationPolicy(.accessory)
 
+        // Enable launch at login
+        enableLaunchAtLogin()
+
         // Create menu bar status item
         setupMenuBar()
 
@@ -52,6 +56,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         print("✓ Midori ready - Press Right Command to start recording")
+    }
+
+    private func enableLaunchAtLogin() {
+        do {
+            try SMAppService.mainApp.register()
+            print("✓ Launch at login enabled")
+        } catch {
+            print("⚠️ Failed to enable launch at login: \(error.localizedDescription)")
+        }
     }
 
     private func setupMenuBar() {
@@ -83,10 +96,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func startRecording() {
         // Wait 1 second before showing waveform and playing pop sound
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            // Play pop sound - try system sound first, fall back to beep
+            // Play pop sound - MULTIPLE TIMES for EXTRA LOUD effect
             if let sound = NSSound(named: "Pop") {
+                sound.volume = 1.0  // Maximum volume!
                 sound.play()
-                print("🔊 Pop sound played")
+                // Play it again immediately for double volume effect
+                if let sound2 = NSSound(named: "Pop") {
+                    sound2.volume = 1.0
+                    sound2.play()
+                }
+                print("🔊🔊 Pop sound played (EXTRA LOUD - 2x)")
             } else {
                 NSSound.beep()
                 print("🔊 Beep sound played (Pop not available)")
@@ -107,24 +126,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hide waveform
         waveformWindow?.hide()
 
-        // Show pulsing dots
-        waveformWindow?.showPulsingDots()
-
         // Get audio data and transcribe
         if let audioData = audioRecorder?.getAudioData() {
             print("📝 Transcribing audio...")
             transcriptionManager?.transcribe(audioData: audioData) { [weak self] result in
                 DispatchQueue.main.async {
-                    // Hide pulsing dots
-                    self?.waveformWindow?.hidePulsingDots()
-
                     switch result {
                     case .success(let text):
                         print("✓ Transcription complete: \(text)")
                         self?.injectText(text)
                     case .failure(let error):
                         print("❌ Transcription failed: \(error.localizedDescription)")
-                        self?.showError(error.localizedDescription)
+                        // Silent failure - no dialog box, just log it
                     }
                 }
             }
@@ -142,14 +155,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        print("📋 Setting pasteboard: \"\(text)\" (\(text.count) chars)")
+        // Add a space after the text for proper sentence separation
+        let textWithSpace = text + " "
+
+        print("📋 Setting pasteboard: \"\(textWithSpace)\" (\(textWithSpace.count) chars)")
 
         // Inject text using pasteboard and Cmd+V simulation
         let pasteboard = NSPasteboard.general
         let changeCount = pasteboard.changeCount
 
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        pasteboard.setString(textWithSpace, forType: .string)
 
         // Verify pasteboard was set correctly
         let pasteboardText = pasteboard.string(forType: .string)

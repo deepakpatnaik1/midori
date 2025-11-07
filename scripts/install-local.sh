@@ -6,11 +6,10 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "🔨 Building Midori..."
-xcodebuild -scheme Midori-Debug -configuration Debug build
+xcodebuild -scheme Midori-Debug -configuration Debug -derivedDataPath ./build build
 
-# Find the built app
-DERIVED_DATA=$(xcodebuild -scheme Midori-Debug -showBuildSettings 2>/dev/null | grep "^\s*BUILD_DIR" | awk '{print $3}')
-BUILT_APP="$DERIVED_DATA/Debug/midori.app"
+# Use local build directory
+BUILT_APP="./build/Build/Products/Debug/midori.app"
 
 # Create stable installation directory
 INSTALL_DIR="$HOME/.local/midori"

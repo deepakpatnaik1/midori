@@ -1,246 +1,256 @@
-# Midori - Production TODO List
+# Midori - Future Enhancements
 
-## Status: Development Complete ✅ | Production Ready 🚧
+## Status: ✅ Production Ready
 
-The app is fully functional with mock data. To move to production, complete the following tasks.
+The app is complete and fully functional with all core features implemented. This document lists potential future enhancements and improvements.
 
-## High Priority (Required for Production)
+## Completed Features ✅
 
-### 1. whisper.cpp Integration
-**Status**: 🚧 Structure ready, needs implementation
+### Core Functionality
+- ✅ Menu bar app infrastructure
+- ✅ Right Command key monitoring (global)
+- ✅ Real audio recording (AVAudioEngine)
+- ✅ Real transcription (NVIDIA Parakeet V2)
+- ✅ Animated waveform visualization (9 bars, gradient)
+- ✅ Pop sound feedback
+- ✅ Text injection at cursor (Accessibility + Pasteboard)
+- ✅ Auto-launch at login (ServiceManagement)
+- ✅ Custom app icon (gradient waveform)
+- ✅ DMG installer for distribution
+- ✅ Error handling and user feedback
+- ✅ Fixed build location (stable permissions)
 
-**Steps**:
-1. Add whisper.cpp dependency
-   - Option A: Swift Package Manager (if available)
-   - Option B: Direct integration of C++ library with bridging header
-   - Option C: Use pre-built whisper.cpp dynamic library
+## Potential Future Enhancements
 
-2. Implement real transcription in [TranscriptionManager.swift](midori/TranscriptionManager.swift)
-   - Replace `realTranscribe()` mock implementation
-   - Convert audio data to whisper.cpp format (16kHz, 16-bit PCM)
-   - Call whisper.cpp API
-   - Extract transcribed text
+### High Priority
 
-3. Download Whisper model on first launch
-   - Implement `downloadModel()` in TranscriptionManager
-   - Store in user-specified directory (per requirements)
-   - Start with "small" model as specified
+#### 1. Permission Setup Helper
+**Status**: Would improve first-run experience
 
-**Files to modify**:
-- `midori/TranscriptionManager.swift` - Lines 60-68 (realTranscribe)
-- `midori/TranscriptionManager.swift` - Lines 72-77 (downloadModel)
+**Description**:
+Add a friendly first-run dialog that:
+- Detects missing permissions (Microphone, Accessibility)
+- Explains why each permission is needed
+- Provides "Open Settings" button that opens the exact System Settings pane
+- Shows visual step-by-step instructions
 
-**Reference**:
-- whisper.cpp repo: https://github.com/ggerganov/whisper.cpp
-- Model download: Hugging Face or official Whisper models
+**Benefits**:
+- Easier for non-technical users
+- Reduces support questions
+- Better first impression
 
----
-
-### 2. Real Audio Recording
-**Status**: 🚧 Code ready, gated behind DEBUG flag
-
-**Steps**:
-1. Test real audio recording path
-   - Build in Release mode or remove `#if DEBUG` blocks
-   - Grant microphone permission when prompted
-   - Verify audio capture works
-
-2. Test audio buffer extraction
-   - Implement `getAudioData()` properly in [AudioRecorder.swift](midori/AudioRecorder.swift)
-   - Return proper audio format for whisper.cpp
-
-**Files to modify**:
-- `midori/AudioRecorder.swift` - Lines 32-37 (remove DEBUG blocks)
-- `midori/AudioRecorder.swift` - Lines 51-56 (getAudioData implementation)
+**Implementation**:
+- Create `PermissionHelper.swift`
+- Check permissions on launch
+- Show SwiftUI dialog if permissions missing
+- Use `NSWorkspace` to open specific System Settings panes
 
 ---
 
-### 3. Text Injection Testing
-**Status**: 🚧 Code ready, needs accessibility permission
+#### 2. Model Management UI
+**Status**: Currently uses default Parakeet V2 model
 
-**Steps**:
-1. Grant accessibility permission
-   ```bash
-   open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-   ```
+**Description**:
+Add preferences window for:
+- Viewing current model
+- Downloading alternative models (if available)
+- Showing model size and performance characteristics
+- Clearing model cache
 
-2. Test text injection in various apps:
-   - TextEdit
-   - Terminal
-   - Slack
-   - VS Code
-   - Notes
-   - Web browsers (Chrome, Safari)
+**Benefits**:
+- More control for advanced users
+- Better disk space management
+- Future-proof for model updates
 
-3. Verify cursor position preservation
-4. Test with existing clipboard contents
-
-**Files to verify**:
-- `midori/midoriApp.swift` - Lines 129-176 (injectText)
+**Implementation**:
+- Create `PreferencesWindow.swift`
+- Add "Preferences..." menu item
+- Show model info and download options
 
 ---
 
-## Medium Priority (UX Improvements)
+### Medium Priority
 
-### 4. Auto-Launch at Login
-**Status**: ❌ Not implemented
+#### 3. Custom Keyboard Shortcuts
+**Status**: Currently hardcoded to Right Command
 
-**Steps**:
-1. Add SMLoginItemSetEnabled to project
-2. Add menu item to toggle auto-launch
-3. Persist preference in UserDefaults
-4. Test launch behavior after restart
+**Description**:
+Allow users to customize the recording hotkey:
+- Change from Right Command to other keys
+- Support modifier combinations (Shift+Option+R, etc.)
+- Prevent conflicts with system shortcuts
 
-**New code needed**:
-- Add launch agent configuration
-- Update menu bar menu with toggle
+**Benefits**:
+- Accessibility for different keyboard layouts
+- User preference flexibility
+- Better ergonomics for some users
 
----
-
-### 5. Model Management
-**Status**: ❌ Not implemented
-
-**Steps**:
-1. Create preferences window/dialog
-2. Allow user to specify model storage directory
-3. Add ability to download different models (tiny, base, small, medium)
-4. Show model file size and estimated performance
-5. Add model switching capability
-
-**New files needed**:
-- `midori/PreferencesWindow.swift` (or similar)
+**Implementation**:
+- Add hotkey recorder control
+- Store in UserDefaults
+- Update KeyMonitor to use custom key
 
 ---
 
-### 6. App Icon
-**Status**: ❌ Using system icon
+#### 4. Recording Settings
+**Status**: Currently uses automatic detection
 
-**Steps**:
-1. Convert [docs/voice.png](docs/voice.png) to .icns format
-   ```bash
-   # Use iconutil or third-party tool
-   ```
-2. Add to Assets.xcassets
-3. Update app icon reference
+**Description**:
+Add configurable recording settings:
+- Volume threshold for start detection
+- Maximum recording duration
+- Audio quality settings
+- Silence detection sensitivity
 
----
+**Benefits**:
+- Better control in noisy environments
+- Prevent accidental long recordings
+- Optimize for user's environment
 
-## Low Priority (Polish)
-
-### 7. Error Recovery
-- Add retry logic for failed transcriptions
-- Show user-friendly error messages
-- Add "Report Issue" option in error dialogs
-
-### 8. Performance Optimization
-- Profile memory usage during long recordings
-- Optimize waveform animation frame rate if needed
-- Test with different Whisper models
-
-### 9. Preferences/Settings
-- Custom keyboard shortcut (instead of Right Command)
-- Volume threshold for recording
-- Language selection (currently English only)
-- Waveform color customization
-
-### 10. Status Feedback
-- Show recording duration in menu bar
-- Add keyboard shortcut indicator
-- Show transcription progress percentage
+**Implementation**:
+- Add settings to Preferences window
+- Store in UserDefaults
+- Update AudioRecorder to use settings
 
 ---
 
-## Testing Checklist
+### Low Priority (Polish)
 
-### Before Production Release
-- [ ] Real audio recording works
-- [ ] whisper.cpp transcription produces accurate results
-- [ ] Text injection works in all major apps
-- [ ] App survives system restart
-- [ ] Auto-launch works (if implemented)
-- [ ] Permissions prompt properly
-- [ ] No memory leaks during extended use
-- [ ] CPU usage acceptable during transcription
-- [ ] Error messages are user-friendly
+#### 5. Advanced Waveform Options
+- Color customization (change gradient colors)
+- Different visualization styles (bars, wave, circle)
+- Size adjustment
+- Opacity control
 
----
+#### 6. Transcription History
+- Keep history of recent transcriptions
+- Allow re-use of previous transcriptions
+- Search through history
+- Export to text file
 
-## Documentation Updates Needed
+#### 7. Language Selection
+- Support for multiple languages (if Parakeet supports)
+- Auto-detect language
+- Per-app language preferences
 
-### When Production Ready
-- [ ] Update README with installation instructions
-- [ ] Add user guide with screenshots
-- [ ] Document model download process
-- [ ] Add troubleshooting section for common issues
-- [ ] Create demo video
+#### 8. Performance Monitoring
+- Show transcription time in console
+- Memory usage stats
+- CPU usage monitoring
+- Performance tips
 
----
+#### 9. Export/Import Settings
+- Export preferences to file
+- Import settings from backup
+- Share settings between machines
 
-## Current Development Status
-
-### ✅ Complete
-- Menu bar app infrastructure
-- Right Command key monitoring
-- Audio recording (mock data)
-- Waveform visualization
-- User feedback sequence (pop sound, dots)
-- Text injection (accessibility)
-- Error handling
-- Build system automation
-- Development workflow
-
-### 🚧 In Progress
-- whisper.cpp integration (structure ready)
-- Real audio recording (code ready, needs testing)
-- Accessibility permission testing
-
-### ❌ Not Started
-- Auto-launch at login
-- Model management UI
-- App icon conversion
-- Preferences window
-- Advanced features
+#### 10. Statistics Dashboard
+- Words transcribed today/week/month
+- Most active apps
+- Average recording duration
+- Accuracy metrics
 
 ---
 
-## How to Get Started on Production Tasks
+## Known Limitations (Won't Fix)
 
-### Option 1: whisper.cpp Integration
-```bash
-# Research whisper.cpp Swift integration
-# Look for existing Swift packages or create bridging header
-# Start with TranscriptionManager.swift modifications
+### Debug Build Requirement
+**Issue**: Release configuration breaks audio/transcription functionality
+**Reason**: Swift compiler optimizations interfere with FluidAudio
+**Impact**: Slightly larger app size (~17MB vs potential ~10MB)
+**Status**: Won't fix - Debug build works perfectly
+
+### Manual Permissions
+**Issue**: Users must manually grant Accessibility permission
+**Reason**: macOS security policy prevents automatic permission grants
+**Impact**: Extra setup step for users
+**Status**: Can't fix - system limitation
+
+---
+
+## Testing Checklist for Future Features
+
+### Before Adding New Features
+- [ ] Ensure backwards compatibility
+- [ ] Don't break existing functionality
+- [ ] Test on clean macOS install
+- [ ] Verify permissions still work
+- [ ] Check memory usage doesn't increase significantly
+- [ ] Test with Debug configuration only
+
+---
+
+## Architecture Notes for Future Development
+
+### Adding New Features
+1. Follow callback-based architecture
+2. Keep managers separate and testable
+3. Use UserDefaults for preferences
+4. Add proper error handling
+5. Include console logging with emoji markers
+6. Test without breaking existing workflow
+
+### Code Organization
 ```
-
-### Option 2: Real Audio Testing
-```bash
-# Remove DEBUG flags from AudioRecorder.swift
-# Build and test with microphone permission
-# Verify audio buffer extraction
-```
-
-### Option 3: Accessibility Testing
-```bash
-# Grant accessibility permission
-# Test text injection in various apps
-# Document any edge cases or issues
+midori/
+├── midori/
+│   ├── Core/                    # Existing core functionality
+│   │   ├── midoriApp.swift
+│   │   ├── KeyMonitor.swift
+│   │   ├── AudioRecorder.swift
+│   │   ├── TranscriptionManager.swift
+│   │   ├── WaveformView.swift
+│   │   └── WaveformWindow.swift
+│   │
+│   ├── Features/                # New features (future)
+│   │   ├── PermissionHelper.swift
+│   │   ├── PreferencesWindow.swift
+│   │   └── HistoryManager.swift
+│   │
+│   └── Resources/
+│       └── Assets.xcassets/
 ```
 
 ---
 
-## Notes
+## Contributing Notes
 
-- **Mock data approach** followed best practices to avoid permission issues during development
-- **Architecture is production-ready** - just needs real implementations
-- **All core functionality works** end-to-end with mock data
-- **Code is well-documented** with TODO comments where production work is needed
+This is a personal project, but if you want to add features:
+
+1. **Test thoroughly** - Don't break the core workflow
+2. **Keep it simple** - Match the minimal design philosophy
+3. **Document changes** - Update all relevant docs
+4. **Debug builds only** - Don't try to fix Release builds
+5. **Follow patterns** - Use existing callback architecture
 
 ---
 
 ## Priority Recommendation
 
-**Start with whisper.cpp integration** - This is the most complex task and core to the app's functionality. Once transcription works, the rest is polish and testing.
+**Most Valuable Next Feature**: Permission Setup Helper
+- Biggest user experience improvement
+- Reduces friction for non-technical users
+- Addresses main distribution challenge
 
-**Next**: Real audio recording and text injection testing
+**Technical Interest**: Custom Keyboard Shortcuts
+- Interesting technical challenge
+- Good user flexibility
+- Doesn't require UI/UX design
 
-**Finally**: UX improvements like auto-launch and preferences
+**Nice to Have**: Model Management UI
+- Future-proof for model updates
+- Advanced user feature
+- Low immediate value
+
+---
+
+## Current Status Summary
+
+**Production Ready**: ✅
+**Core Features**: 100% Complete
+**Polish Features**: Optional enhancements listed above
+**Distribution**: Ready to share (DMG available)
+
+The app is feature-complete for its core purpose: voice-to-text transcription with the Right Command key.
+
+All items in this document are **optional enhancements** that would make the app even better, but are not required for it to be useful and functional.
