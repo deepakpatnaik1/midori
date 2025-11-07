@@ -11,37 +11,30 @@ echo "📦 Creating Midori installer DMG..."
 echo ""
 
 # Configuration
-APP_NAME="Midori"
+APP_NAME="midori"
 DMG_NAME="Midori-Installer"
-BUILD_DIR="./build"
 DMG_DIR="./dmg-staging"
 RELEASE_DIR="./release"
+FIXED_LOCATION="$HOME/.local/midori/${APP_NAME}.app"
 
-# Clean up completely - including DerivedData cache
-echo "🧹 Cleaning ALL build caches..."
-rm -rf "$BUILD_DIR" "$DMG_DIR" "$RELEASE_DIR"
-rm -rf ~/Library/Developer/Xcode/DerivedData/midori-*
+# Clean up staging and release directories
+echo "🧹 Cleaning staging directories..."
+rm -rf "$DMG_DIR" "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 mkdir -p "$DMG_DIR"
 
-# Build Debug configuration (optimizations break functionality)
-echo "🔨 Building Midori (Debug) - Clean build in ./build only..."
-xcodebuild \
-    -scheme Midori-Debug \
-    -configuration Debug \
-    -derivedDataPath "$BUILD_DIR" \
-    build 2>&1 | grep -E "(Build|error|warning|✓)" || true
-
-# Find built app
-BUILT_APP="$BUILD_DIR/Build/Products/Debug/${APP_NAME}.app"
-
-if [ ! -d "$BUILT_APP" ]; then
-    echo "❌ Build failed - app not found"
+# Check if app exists at fixed location
+if [ ! -d "$FIXED_LOCATION" ]; then
+    echo "❌ App not found at fixed location: $FIXED_LOCATION"
+    echo "   Please run: ./scripts/install-local.sh first"
     exit 1
 fi
 
-echo "✅ Build complete!"
+echo "✅ Using app from fixed location: $FIXED_LOCATION"
 echo ""
+
+# Use the app from fixed location
+BUILT_APP="$FIXED_LOCATION"
 
 # Stage DMG contents
 echo "📋 Preparing DMG contents..."
@@ -56,11 +49,19 @@ cat > "$DMG_DIR/INSTALL.txt" << 'EOF'
 
 📥 INSTALLATION (3 steps):
 
-1. Drag "Midori.app" to the "Applications" folder
+1. Drag "midori.app" to the "Applications" folder
 2. Open Midori from Applications or Spotlight (⌘+Space → "Midori")
 3. Grant permissions:
    • Microphone: Click "OK" when prompted
    • Accessibility: System Settings → Privacy & Security → Accessibility → Enable Midori
+
+⚠️  FIRST LAUNCH (One-time setup):
+
+• The app will download the AI model (~100MB) on first launch
+• This happens automatically in the background
+• Wait 1-2 minutes for download to complete
+• Internet connection required for first launch only
+• Model is cached locally for instant future use
 
 🎤 USAGE:
 
@@ -76,12 +77,14 @@ cat > "$DMG_DIR/INSTALL.txt" << 'EOF'
 ✓ Menu bar icon to quit/restart
 ✓ Fast AI transcription (NVIDIA Parakeet V2)
 ✓ Beautiful waveform visualization while recording
+✓ Ultra-sensitive to soft speaking voices
 
 💡 TIPS:
 
 • Look for the waveform icon in your menu bar
 • To quit: Click menu bar icon → Quit
 • To restart: Click menu bar icon → Restart
+• Hold Right Command for 1+ second before speaking
 
 Enjoy hands-free transcription! 🎉
 EOF
@@ -99,8 +102,8 @@ hdiutil create \
 # Get file size
 DMG_SIZE=$(du -h "$RELEASE_DIR/${DMG_NAME}.dmg" | cut -f1)
 
-# Clean up build artifacts
-rm -rf "$DMG_DIR" "$BUILD_DIR"
+# Clean up staging artifacts
+rm -rf "$DMG_DIR"
 
 echo ""
 echo "════════════════════════════════════════════"
