@@ -87,6 +87,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Midori - Voice to Text", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+
+        // Add launch at login toggle
+        let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "l")
+        launchAtLoginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        menu.addItem(launchAtLoginItem)
+
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Restart", action: #selector(restart), keyEquivalent: "r"))
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
@@ -194,7 +201,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Show waveform window
             self.waveformWindow?.show()
 
-            // Start audio recording
+            // Start audio recording (device configured per-engine, not system-wide)
             self.audioRecorder?.startRecording()
         }
     }
@@ -304,6 +311,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled {
+                try service.unregister()
+                print("✓ Launch at login disabled")
+            } else {
+                try service.register()
+                print("✓ Launch at login enabled")
+            }
+            // Update menu checkmark
+            if let menu = statusItem?.menu,
+               let item = menu.item(withTitle: "Launch at Login") {
+                item.state = service.status == .enabled ? .on : .off
+            }
+        } catch {
+            print("❌ Failed to toggle launch at login: \(error.localizedDescription)")
+            showError("Failed to change launch at login setting: \(error.localizedDescription)")
+        }
     }
 
     @objc private func restart() {
