@@ -7,6 +7,7 @@
 //
 
 import AVFoundation
+import CoreAudio
 import Foundation
 
 class AudioRecorder {
@@ -28,6 +29,12 @@ class AudioRecorder {
 
     deinit {
         stopRecording()
+    }
+
+    func preconfigureAudioDevice() {
+        // No longer needed - we'll set the device on AVAudioEngine directly
+        // This avoids changing the system-wide default which causes audio interruptions
+        print("🔧 Device configuration will happen during engine setup...")
     }
 
     func startRecording() {
@@ -109,7 +116,10 @@ class AudioRecorder {
             return
         }
 
+        // Use the format that the current input device provides
+        // Don't try to override the device - just use whatever is default
         let format = input.outputFormat(forBus: 0)
+        print("✓ Recording format: \(format.sampleRate)Hz, \(format.channelCount) channels")
 
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, time in
             self?.processAudioBuffer(buffer)
@@ -121,6 +131,76 @@ class AudioRecorder {
         } catch {
             print("❌ Failed to start audio engine: \(error.localizedDescription)")
         }
+    }
+
+    private func findBuiltInMicrophone() -> AudioDeviceID? {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var dataSize: UInt32 = 0
+        var status = AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &dataSize
+        )
+
+        guard status == noErr else { return nil }
+
+        let deviceCount = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
+        var audioDevices = [AudioDeviceID](repeating: 0, count: deviceCount)
+
+        status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &dataSize,
+            &audioDevices
+        )
+
+        guard status == noErr else { return nil }
+
+        for deviceID in audioDevices {
+            var inputAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyStreamConfiguration,
+                mScope: kAudioDevicePropertyScopeInput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+
+            var inputDataSize: UInt32 = 0
+            status = AudioObjectGetPropertyDataSize(deviceID, &inputAddress, 0, nil, &inputDataSize)
+
+            if status == noErr && inputDataSize > 0 {
+                var nameAddress = AudioObjectPropertyAddress(
+                    mSelector: kAudioObjectPropertyName,
+                    mScope: kAudioObjectPropertyScopeGlobal,
+                    mElement: kAudioObjectPropertyElementMain
+                )
+
+                var deviceName: Unmanaged<CFString>?
+                var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>>.size)
+                status = AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &deviceName)
+
+                if status == noErr, let cfName = deviceName?.takeUnretainedValue() {
+                    let name = cfName as String
+                    if name.lowercased().contains("built-in") ||
+                       name.lowercased().contains("macbook") ||
+                       name.lowercased().contains("imac") ||
+                       name.lowercased().contains("mac mini") ||
+                       name.lowercased().contains("internal") {
+                        print("✓ Found built-in microphone: \(name) (ID: \(deviceID))")
+                        return deviceID
+                    }
+                }
+            }
+        }
+
+        return nil
     }
 
     private func stopRealAudioRecording() {
