@@ -133,25 +133,27 @@ print("📋 Setting pasteboard: [REDACTED]")
 
 ## 6. **App Sandbox**
 
-**Issue:** App sandbox is DISABLED
+**Issue:** App sandbox is DISABLED in both Debug and Release configurations
 - Found: `ENABLE_APP_SANDBOX = NO` in Debug configuration
-- Found: `ENABLE_APP_SANDBOX = YES` in Release configuration
+- Found: `ENABLE_APP_SANDBOX = NO` in Release configuration (updated 2025-11-10)
 
 **Risk:**
-- Debug builds have full system access
+- Both builds have full system access
 - Could access files outside app container
 - Could make network connections without restrictions
 
-**Severity:** MEDIUM (Debug), LOW (Release)
+**Severity:** MEDIUM (Accepted risk)
 
 **Current Status:**
-- Release builds appear to have sandbox ENABLED
-- Debug builds for development have it disabled
+- Sandbox disabled in both Debug and Release builds
+- Required for global key event monitoring (NSEvent)
+- Required for Accessibility-based text injection
+- Required for full microphone access
 
 **Recommendation:**
-- ✅ Release builds already sandboxed
-- Document why Debug builds need sandbox disabled (Accessibility features)
-- Ensure distribution DMG uses Release/sandboxed build
+- ✅ Documented as required for app functionality
+- Alternative: Could use CGEvent with explicit Accessibility permissions, but NSEvent is more reliable
+- App requires explicit user permissions (Microphone + Accessibility) which provides security boundary
 
 ## 7. **Model Download Security**
 
