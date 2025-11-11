@@ -11,11 +11,11 @@ echo "📦 Creating Midori installer DMG..."
 echo ""
 
 # Configuration
-APP_NAME="midori"
+APP_NAME="Midori"
 DMG_NAME="Midori-Installer"
 DMG_DIR="./dmg-staging"
 RELEASE_DIR="./release"
-FIXED_LOCATION="$HOME/.local/midori/${APP_NAME}.app"
+RELEASE_BUILD="./build/Build/Products/Release/${APP_NAME}.app"
 
 # Clean up staging and release directories
 echo "🧹 Cleaning staging directories..."
@@ -23,18 +23,24 @@ rm -rf "$DMG_DIR" "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 mkdir -p "$DMG_DIR"
 
-# Check if app exists at fixed location
-if [ ! -d "$FIXED_LOCATION" ]; then
-    echo "❌ App not found at fixed location: $FIXED_LOCATION"
-    echo "   Please run: ./scripts/install-local.sh first"
-    exit 1
+# Check if Release build exists, otherwise build it
+if [ ! -d "$RELEASE_BUILD" ]; then
+    echo "⚠️  Release build not found at: $RELEASE_BUILD"
+    echo "🔨 Building Release configuration..."
+    xcodebuild clean -scheme Midori-Debug -configuration Release
+    xcodebuild -scheme Midori-Debug -configuration Release -derivedDataPath ./build build
+
+    if [ ! -d "$RELEASE_BUILD" ]; then
+        echo "❌ Release build failed"
+        exit 1
+    fi
 fi
 
-echo "✅ Using app from fixed location: $FIXED_LOCATION"
+echo "✅ Using Release build: $RELEASE_BUILD"
 echo ""
 
-# Use the app from fixed location
-BUILT_APP="$FIXED_LOCATION"
+# Use the Release build
+BUILT_APP="$RELEASE_BUILD"
 
 # Stage DMG contents
 echo "📋 Preparing DMG contents..."

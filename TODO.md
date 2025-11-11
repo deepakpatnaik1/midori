@@ -154,12 +154,6 @@ Add configurable recording settings:
 
 ## Known Limitations (Won't Fix)
 
-### Debug Build Requirement
-**Issue**: Release configuration breaks audio/transcription functionality
-**Reason**: Swift compiler optimizations interfere with FluidAudio
-**Impact**: Slightly larger app size (~17MB vs potential ~10MB)
-**Status**: Won't fix - Debug build works perfectly
-
 ### Manual Permissions
 **Issue**: Users must manually grant Accessibility permission
 **Reason**: macOS security policy prevents automatic permission grants

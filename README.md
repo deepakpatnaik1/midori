@@ -105,9 +105,9 @@ Clean separation of concerns with callback-based communication.
 ```
 
 ### Key Features
-- **Fixed build location** - `build/Build/Products/Debug/midori.app`
+- **Fixed build location** - `build/Build/Products/{Debug|Release}/midori.app`
 - **No permission resets** - Same path = persistent permissions
-- **Debug configuration** - Release optimizations break audio/transcription
+- **Both configurations work** - Debug and Release builds fully functional
 - **Local package** - FluidAudio integrated via local Swift package
 
 ### Open in Xcode
@@ -176,7 +176,7 @@ midori/
 The app is distributed as a DMG installer:
 - **File**: `release/Midori-Installer.dmg`
 - **Size**: ~17 MB
-- **Configuration**: Debug (Release optimizations break functionality)
+- **Configuration**: Release (optimized for distribution)
 - **Contents**: App + Instructions + Applications symlink
 
 Recipients just need to:
@@ -186,7 +186,6 @@ Recipients just need to:
 
 ## Known Limitations
 
-- **Debug build required**: Swift Release optimizations break audio/transcription functionality
 - **Manual permissions**: macOS requires users to manually grant Accessibility and Microphone permissions
 - **Apple Silicon optimized**: Primarily tested on Apple Silicon Macs
 

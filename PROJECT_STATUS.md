@@ -149,10 +149,10 @@ All managers use **callbacks** to communicate back to AppDelegate.
 
 ## Build Configuration
 
-- **Scheme**: Midori-Debug (locked to Debug)
-- **Configuration**: Debug (Release optimizations break functionality)
+- **Scheme**: Midori-Debug
+- **Configuration**: Debug or Release (both work!)
 - **Build Dir**: `build/` (project-relative, persistent)
-- **Sandbox**: Disabled (required for key monitoring)
+- **Sandbox**: Disabled (required for key monitoring and accessibility)
 - **LSUIElement**: YES (menu bar only, no dock)
 - **Permissions**: Microphone + Accessibility
 - **Auto-launch**: ServiceManagement API
@@ -164,12 +164,11 @@ All managers use **callbacks** to communicate back to AppDelegate.
 3. **Callback architecture**: Clean separation of concerns
 4. **SwiftUI + AppKit**: Best of both worlds
 5. **Fixed build location**: Permissions persist across rebuilds
-6. **Debug configuration**: Release optimizations break audio/transcription
+6. **No sandbox**: App sandbox disabled in both Debug and Release for full system access
 7. **Local package**: FluidAudio integrated as local Swift package
 
 ## Known Limitations
 
-- **Debug build required**: Swift Release optimizations break audio/transcription functionality
 - **Manual permissions**: macOS requires users to manually grant Accessibility permission
 - **Apple Silicon optimized**: Primarily tested on Apple Silicon Macs
 

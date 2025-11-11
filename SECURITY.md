@@ -134,30 +134,26 @@ print("📋 Setting pasteboard: [REDACTED]")
 ## 6. **App Sandbox**
 
 **Issue:** App sandbox is DISABLED in both Debug and Release configurations
+- Found: `ENABLE_APP_SANDBOX = NO` in Debug configuration
+- Found: `ENABLE_APP_SANDBOX = NO` in Release configuration (updated 2025-11-10)
 
 **Risk:**
-- App has full system access
+- Both builds have full system access
 - Could access files outside app container
 - Could make network connections without restrictions
 
-**Severity:** LOW (Required for functionality)
+**Severity:** MEDIUM (Accepted risk)
 
 **Current Status:**
-- App Sandbox DISABLED in both Debug and Release builds
-- **Required** because app uses Accessibility API for CGEvent posting (Cmd+V injection)
-- App Sandbox blocks CGEvent posting for security reasons
-- Without CGEvents, text injection would not work
-
-**Rationale:**
-- App requires Accessibility permission which already grants powerful system access
-- Sandboxing would break core functionality (text injection)
-- App security model relies on user-granted Accessibility permission
-- Not eligible for App Store distribution anyway (uses global key monitoring + Accessibility)
+- Sandbox disabled in both Debug and Release builds
+- Required for global key event monitoring (NSEvent)
+- Required for Accessibility-based text injection
+- Required for full microphone access
 
 **Recommendation:**
-- ✅ Current configuration is correct for app requirements
-- Document clearly that app requires full system access for Accessibility features
-- Users already grant Accessibility permission which provides security boundary
+- ✅ Documented as required for app functionality
+- Alternative: Could use CGEvent with explicit Accessibility permissions, but NSEvent is more reliable
+- App requires explicit user permissions (Microphone + Accessibility) which provides security boundary
 
 ## 7. **Model Download Security**
 
@@ -249,49 +245,37 @@ DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
 
 ## Recommendations Summary
 
-### ✅ Implemented (Completed)
+### Immediate Actions (High Priority)
 
-1. **Remove sensitive data from logs** (HIGH PRIORITY) - ✅ DONE
-   - Redacted transcribed text from console output
+1. **Remove sensitive data from logs**
+   - Redact transcribed text from console output
    - Only log metadata (length, timestamp)
-   - Fixed in TranscriptionManager.swift and midoriApp.swift (4 locations)
 
-2. **Launch at login toggle** - ✅ DONE
-   - Added menu bar toggle for launch at login
-   - Integrates with macOS System Settings → General → Login Items
-   - Users can control from both menu bar and system preferences
+2. **Verify model download security**
+   - Confirm FluidAudio uses HTTPS
+   - Check for integrity validation
 
-3. **Verify sandbox configuration** - ✅ DONE
-   - App Sandbox disabled in both Debug and Release (required for CGEvent posting)
-   - Sandboxing would block Accessibility API functionality
-   - Security relies on user-granted Accessibility permission
+### Medium Priority
 
-### ⚠️ Documented But Not Implemented
+3. **Document clipboard behavior**
+   - Warn users clipboard will be overwritten
+   - Add to INSTALL.txt
 
-4. **Clipboard behavior** (MEDIUM PRIORITY)
-   - Already documented in INSTALL.txt
-   - Necessary for app functionality - cannot be changed
+4. **Add input validation**
+   - Limit transcription length
+   - Handle edge cases gracefully
 
-5. **Model download security** (LOW PRIORITY)
-   - FluidAudio handles downloads (likely HTTPS)
-   - Model download triggers correctly on first launch
-   - No action needed - trusting upstream library
+5. **Improve restart security**
+   - Validate executable path before launching
 
-6. **Input validation** (LOW PRIORITY)
-   - Not needed for local, free app
-   - Transcription length naturally limited by recording duration
-   - No practical issues observed
+### Low Priority
 
-7. **Thread.sleep() replacement** (LOW PRIORITY)
-   - No UI freeze observed in real-world usage
-   - 0.1 second delay is imperceptible
-   - Not a priority to change
+6. **Replace Thread.sleep()**
+   - Use async patterns instead
 
-### 🔒 Already Secure (No Action Needed)
-
-8. **CGEvent Injection** - Already properly gated behind accessibility permission
-9. **Audio Recording Security** - Already secure with user-initiated recording only
-10. **Process Restart** - Uses trusted Bundle.main.executablePath, no user input
+7. **Consider first-run dialog**
+   - Explain launch at login
+   - Explain permissions needed
 
 ---
 
