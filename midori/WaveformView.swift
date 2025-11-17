@@ -97,8 +97,8 @@ struct WaveformView: View {
 
         for i in 0..<9 {
             if !isSpeaking {
-                // Keep as tiny circles when silent with slight variation
-                barHeights[i] = 0.22 + CGFloat.random(in: 0...0.02)
+                // Base state: straight line of dots (all same height)
+                barHeights[i] = 0.23
             } else {
                 // Each bar dances with its own unique frequency
                 let frequency = 4.0 + Double(i) * 0.7
