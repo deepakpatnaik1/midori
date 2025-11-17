@@ -277,8 +277,8 @@ class AudioRecorder {
 
         print("✓ Captured \(recordedBuffers.count) audio buffers")
 
-        // Clear buffers to prevent memory buildup
-        recordedBuffers.removeAll()
+        // DON'T clear buffers here - they're needed for getAudioData()
+        // Buffers will be cleared at the start of next recording
     }
 
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
