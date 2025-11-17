@@ -16,6 +16,7 @@ class AudioRecorder {
     private var audioBuffer: AVAudioPCMBuffer?
     private var isRecording = false
     private var recordedBuffers: [AVAudioPCMBuffer] = []
+    private let maxBuffers = 300 // ~10 seconds at 4096 buffer size
 
     // Mock data generation
     private var mockTimer: Timer?
@@ -116,8 +117,12 @@ class AudioRecorder {
             return
         }
 
+        // Find and set the best available microphone (AirPods if connected, otherwise built-in)
+        if let deviceID = findBestAvailableMicrophone() {
+            setInputDevice(deviceID, on: engine)
+        }
+
         // Use the format that the current input device provides
-        // Don't try to override the device - just use whatever is default
         let format = input.outputFormat(forBus: 0)
         print("✓ Recording format: \(format.sampleRate)Hz, \(format.channelCount) channels")
 
@@ -130,10 +135,15 @@ class AudioRecorder {
             print("✓ Audio engine started")
         } catch {
             print("❌ Failed to start audio engine: \(error.localizedDescription)")
+            // Clean up on failure
+            input.removeTap(onBus: 0)
+            audioEngine = nil
+            inputNode = nil
+            isRecording = false
         }
     }
 
-    private func findBuiltInMicrophone() -> AudioDeviceID? {
+    private func findBestAvailableMicrophone() -> AudioDeviceID? {
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -165,6 +175,9 @@ class AudioRecorder {
 
         guard status == noErr else { return nil }
 
+        var airPodsDevice: AudioDeviceID?
+        var builtInDevice: AudioDeviceID?
+
         for deviceID in audioDevices {
             var inputAddress = AudioObjectPropertyAddress(
                 mSelector: kAudioDevicePropertyStreamConfiguration,
@@ -188,35 +201,98 @@ class AudioRecorder {
 
                 if status == noErr, let cfName = deviceName?.takeUnretainedValue() {
                     let name = cfName as String
-                    if name.lowercased().contains("built-in") ||
-                       name.lowercased().contains("macbook") ||
-                       name.lowercased().contains("imac") ||
-                       name.lowercased().contains("mac mini") ||
-                       name.lowercased().contains("internal") {
+
+                    // Check for AirPods first (highest priority)
+                    if name.lowercased().contains("airpods") {
+                        print("✓ Found AirPods: \(name) (ID: \(deviceID))")
+                        airPodsDevice = deviceID
+                    }
+                    // Check for built-in microphone (fallback)
+                    else if name.lowercased().contains("built-in") ||
+                            name.lowercased().contains("macbook") ||
+                            name.lowercased().contains("imac") ||
+                            name.lowercased().contains("mac mini") ||
+                            name.lowercased().contains("internal") {
                         print("✓ Found built-in microphone: \(name) (ID: \(deviceID))")
-                        return deviceID
+                        builtInDevice = deviceID
                     }
                 }
             }
         }
 
-        return nil
+        // Priority: AirPods > Built-in > nil (system default)
+        if let airPods = airPodsDevice {
+            print("🎧 Using AirPods microphone")
+            return airPods
+        } else if let builtIn = builtInDevice {
+            print("🎙️ Using built-in microphone")
+            return builtIn
+        } else {
+            print("⚠️ No specific device found, using system default")
+            return nil
+        }
+    }
+
+    private func setInputDevice(_ deviceID: AudioDeviceID, on engine: AVAudioEngine) {
+        var deviceID = deviceID
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            UInt32(MemoryLayout<AudioDeviceID>.size),
+            &deviceID
+        )
+
+        if status == noErr {
+            print("✓ Successfully set input device to ID: \(deviceID)")
+        } else {
+            print("⚠️ Failed to set input device (status: \(status))")
+        }
     }
 
     private func stopRealAudioRecording() {
-        inputNode?.removeTap(onBus: 0)
-        audioEngine?.stop()
+        // Ensure tap is removed before stopping engine
+        if let input = inputNode {
+            input.removeTap(onBus: 0)
+        }
+
+        // Stop engine if it's running
+        if let engine = audioEngine, engine.isRunning {
+            engine.stop()
+        }
+
+        // Clear references
         audioEngine = nil
         inputNode = nil
+
+        // Reset audio level
         onAudioLevelUpdate?(0.0)
 
         print("✓ Captured \(recordedBuffers.count) audio buffers")
+
+        // Clear buffers to prevent memory buildup
+        recordedBuffers.removeAll()
     }
 
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
         // Store buffer for transcription (copy it to avoid memory issues)
-        if let copy = buffer.copy() as? AVAudioPCMBuffer {
-            recordedBuffers.append(copy)
+        // Limit buffer count to prevent unbounded memory growth
+        if recordedBuffers.count < maxBuffers {
+            if let copy = buffer.copy() as? AVAudioPCMBuffer {
+                recordedBuffers.append(copy)
+            }
+        } else {
+            // If we've hit the limit, just log a warning
+            if recordedBuffers.count == maxBuffers {
+                print("⚠️ Reached maximum buffer limit (\(maxBuffers)), no longer storing audio")
+            }
         }
 
         // Calculate audio level for visualization
