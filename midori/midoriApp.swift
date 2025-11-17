@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var audioRecorder: AudioRecorder?
     var waveformWindow: WaveformWindow?
     var transcriptionManager: TranscriptionManager?
+    var aboutWindow: AboutWindow?
 
     // Keep strong references to sound objects to prevent deallocation
     var popSound1: NSSound?
@@ -53,6 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioRecorder = AudioRecorder()
         transcriptionManager = TranscriptionManager()
         waveformWindow = WaveformWindow()
+        aboutWindow = AboutWindow()
 
         // Setup audio recorder callback
         audioRecorder?.onAudioLevelUpdate = { [weak self] level in
@@ -87,6 +89,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Midori - Voice to Text", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+
+        // Add About menu item
+        menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
 
         // Add launch at login toggle
         let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "l")
@@ -311,6 +316,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    @objc private func showAbout() {
+        print("ℹ️ Showing About window")
+        aboutWindow?.show()
     }
 
     @objc private func toggleLaunchAtLogin() {
