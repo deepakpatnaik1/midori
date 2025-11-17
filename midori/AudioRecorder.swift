@@ -32,10 +32,92 @@ class AudioRecorder {
         stopRecording()
     }
 
-    func preconfigureAudioDevice() {
-        // No longer needed - we'll set the device on AVAudioEngine directly
-        // This avoids changing the system-wide default which causes audio interruptions
-        print("🔧 Device configuration will happen during engine setup...")
+    // Get list of all available input devices for menu
+    func getAvailableInputDevices() -> [(id: AudioDeviceID, name: String)] {
+        var devices: [(id: AudioDeviceID, name: String)] = []
+        var seenNames = Set<String>()
+
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var dataSize: UInt32 = 0
+        var status = AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &dataSize
+        )
+
+        guard status == noErr else { return devices }
+
+        let deviceCount = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
+        var audioDevices = [AudioDeviceID](repeating: 0, count: deviceCount)
+
+        status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &dataSize,
+            &audioDevices
+        )
+
+        guard status == noErr else { return devices }
+
+        for deviceID in audioDevices {
+            var inputAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyStreamConfiguration,
+                mScope: kAudioDevicePropertyScopeInput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+
+            var inputDataSize: UInt32 = 0
+            status = AudioObjectGetPropertyDataSize(deviceID, &inputAddress, 0, nil, &inputDataSize)
+
+            if status == noErr && inputDataSize > 0 {
+                var nameAddress = AudioObjectPropertyAddress(
+                    mSelector: kAudioObjectPropertyName,
+                    mScope: kAudioObjectPropertyScopeGlobal,
+                    mElement: kAudioObjectPropertyElementMain
+                )
+
+                var deviceName: Unmanaged<CFString>?
+                var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>>.size)
+                status = AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &deviceName)
+
+                if status == noErr, let cfName = deviceName?.takeUnretainedValue() {
+                    let name = cfName as String
+
+                    // Skip speakers/output devices
+                    if name.lowercased().contains("speakers") || name.lowercased().contains("output") {
+                        continue
+                    }
+
+                    // Clean up name - simplify for display
+                    var displayName = name
+                    if name.contains("AirPods") {
+                        displayName = "AirPods Pro"
+                    } else if name.lowercased().contains("imac") || name.lowercased().contains("built-in") {
+                        displayName = "iMac"
+                    }
+
+                    // Skip duplicates
+                    if seenNames.contains(displayName) {
+                        continue
+                    }
+
+                    seenNames.insert(displayName)
+                    devices.append((id: deviceID, name: displayName))
+                    print("✓ Found input device: \(displayName) (ID: \(deviceID))")
+                }
+            }
+        }
+
+        return devices
     }
 
     func startRecording() {
@@ -117,11 +199,6 @@ class AudioRecorder {
             return
         }
 
-        // Find and set the best available microphone (AirPods if connected, otherwise built-in)
-        if let deviceID = findBestAvailableMicrophone() {
-            setInputDevice(deviceID, on: engine)
-        }
-
         // Use the format that the current input device provides
         let format = input.outputFormat(forBus: 0)
         print("✓ Recording format: \(format.sampleRate)Hz, \(format.channelCount) channels")
@@ -140,120 +217,6 @@ class AudioRecorder {
             audioEngine = nil
             inputNode = nil
             isRecording = false
-        }
-    }
-
-    private func findBestAvailableMicrophone() -> AudioDeviceID? {
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDevices,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        var dataSize: UInt32 = 0
-        var status = AudioObjectGetPropertyDataSize(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize
-        )
-
-        guard status == noErr else { return nil }
-
-        let deviceCount = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
-        var audioDevices = [AudioDeviceID](repeating: 0, count: deviceCount)
-
-        status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize,
-            &audioDevices
-        )
-
-        guard status == noErr else { return nil }
-
-        var airPodsDevice: AudioDeviceID?
-        var builtInDevice: AudioDeviceID?
-
-        for deviceID in audioDevices {
-            var inputAddress = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyStreamConfiguration,
-                mScope: kAudioDevicePropertyScopeInput,
-                mElement: kAudioObjectPropertyElementMain
-            )
-
-            var inputDataSize: UInt32 = 0
-            status = AudioObjectGetPropertyDataSize(deviceID, &inputAddress, 0, nil, &inputDataSize)
-
-            if status == noErr && inputDataSize > 0 {
-                var nameAddress = AudioObjectPropertyAddress(
-                    mSelector: kAudioObjectPropertyName,
-                    mScope: kAudioObjectPropertyScopeGlobal,
-                    mElement: kAudioObjectPropertyElementMain
-                )
-
-                var deviceName: Unmanaged<CFString>?
-                var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>>.size)
-                status = AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &deviceName)
-
-                if status == noErr, let cfName = deviceName?.takeUnretainedValue() {
-                    let name = cfName as String
-
-                    // Check for AirPods first (highest priority)
-                    if name.lowercased().contains("airpods") {
-                        print("✓ Found AirPods: \(name) (ID: \(deviceID))")
-                        airPodsDevice = deviceID
-                    }
-                    // Check for built-in microphone (fallback)
-                    else if name.lowercased().contains("built-in") ||
-                            name.lowercased().contains("macbook") ||
-                            name.lowercased().contains("imac") ||
-                            name.lowercased().contains("mac mini") ||
-                            name.lowercased().contains("internal") {
-                        print("✓ Found built-in microphone: \(name) (ID: \(deviceID))")
-                        builtInDevice = deviceID
-                    }
-                }
-            }
-        }
-
-        // Priority: AirPods > Built-in > nil (system default)
-        if let airPods = airPodsDevice {
-            print("🎧 Using AirPods microphone")
-            return airPods
-        } else if let builtIn = builtInDevice {
-            print("🎙️ Using built-in microphone")
-            return builtIn
-        } else {
-            print("⚠️ No specific device found, using system default")
-            return nil
-        }
-    }
-
-    private func setInputDevice(_ deviceID: AudioDeviceID, on engine: AVAudioEngine) {
-        var deviceID = deviceID
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        let status = AudioObjectSetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            UInt32(MemoryLayout<AudioDeviceID>.size),
-            &deviceID
-        )
-
-        if status == noErr {
-            print("✓ Successfully set input device to ID: \(deviceID)")
-        } else {
-            print("⚠️ Failed to set input device (status: \(status))")
         }
     }
 
