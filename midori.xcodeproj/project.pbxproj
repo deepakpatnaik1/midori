@@ -6,13 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BD7D3F192ECB4DAC00BBF418 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = BD7D3F182ECB4DAC00BBF418 /* WhisperKit */; };
+		BD7D3F1E2ECB548A00BBF418 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = BD7D3F1D2ECB548A00BBF418 /* FluidAudio */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		BDEED7F12EBC80BA0003B899 /* midori.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = midori.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXBuildFile section */
-		BDEED8002EBC90BA0003B899 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = BDEED7FF2EBC90BA0003B899 /* FluidAudio */; };
-/* End PBXBuildFile section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BDEED7F32EBC80BA0003B899 /* midori */ = {
@@ -27,7 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BDEED8002EBC90BA0003B899 /* FluidAudio in Frameworks */,
+				BD7D3F1E2ECB548A00BBF418 /* FluidAudio in Frameworks */,
+				BD7D3F192ECB4DAC00BBF418 /* WhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -70,7 +72,8 @@
 			);
 			name = midori;
 			packageProductDependencies = (
-				BDEED7FF2EBC90BA0003B899 /* FluidAudio */,
+				BD7D3F182ECB4DAC00BBF418 /* WhisperKit */,
+				BD7D3F1D2ECB548A00BBF418 /* FluidAudio */,
 			);
 			productName = midori;
 			productReference = BDEED7F12EBC80BA0003B899 /* midori.app */;
@@ -101,7 +104,8 @@
 			mainGroup = BDEED7E82EBC80BA0003B899;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				BDEED7FE2EBC90BA0003B899 /* XCLocalSwiftPackageReference "FluidAudio-Local" */,
+				BD7D3F172ECB4DAC00BBF418 /* XCRemoteSwiftPackageReference "WhisperKit" */,
+				BD7D3F1C2ECB548A00BBF418 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BDEED7F22EBC80BA0003B899 /* Products */;
@@ -340,17 +344,34 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		BDEED7FE2EBC90BA0003B899 /* XCLocalSwiftPackageReference "FluidAudio-Local" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "FluidAudio-Local";
+/* Begin XCRemoteSwiftPackageReference section */
+		BD7D3F172ECB4DAC00BBF418 /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+		BD7D3F1C2ECB548A00BBF418 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		BDEED7FF2EBC90BA0003B899 /* FluidAudio */ = {
+		BD7D3F182ECB4DAC00BBF418 /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BDEED7FE2EBC90BA0003B899 /* XCLocalSwiftPackageReference "FluidAudio-Local" */;
+			package = BD7D3F172ECB4DAC00BBF418 /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+		BD7D3F1D2ECB548A00BBF418 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD7D3F1C2ECB548A00BBF418 /* XCRemoteSwiftPackageReference "FluidAudio" */;
 			productName = FluidAudio;
 		};
 /* End XCSwiftPackageProductDependency section */
