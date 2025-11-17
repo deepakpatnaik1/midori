@@ -346,10 +346,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func restart() {
         print("🔄 Restarting Midori...")
+
+        guard let executableURL = Bundle.main.executableURL else {
+            print("❌ Failed to get executable URL")
+            showError("Unable to restart: Could not find executable path")
+            return
+        }
+
         let task = Process()
-        task.launchPath = Bundle.main.executablePath
-        task.launch()
-        NSApp.terminate(nil)
+        task.executableURL = executableURL
+
+        do {
+            try task.run()
+            NSApp.terminate(nil)
+        } catch {
+            print("❌ Failed to restart: \(error.localizedDescription)")
+            showError("Failed to restart: \(error.localizedDescription)")
+        }
     }
 
     @objc private func quit() {
