@@ -125,7 +125,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             print("✓ Recording initiation accepted")
 
-            // Create cancellable timer for the 1-second delay
+            // Create cancellable timer for the 0.5-second delay
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
                 // Execute startRecording on the state queue to ensure thread safety
@@ -135,7 +135,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             self.recordingStartTimer = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
         }
     }
 
@@ -143,11 +143,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         stateQueue.async { [weak self] in
             guard let self = self else { return }
 
-            // Cancel pending start timer if key released before 1 second
+            // Cancel pending start timer if key released before 0.5 second
             if let timer = self.recordingStartTimer {
                 timer.cancel()
                 self.recordingStartTimer = nil
-                print("⚠️ Key released before 1s - Recording cancelled")
+                print("⚠️ Key released before 0.5s - Recording cancelled")
                 return
             }
 
