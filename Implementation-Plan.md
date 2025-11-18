@@ -51,39 +51,63 @@ This is a high-level, chunk-by-chunk plan to transform Midori from its current s
 
 **Goal**: Add post-processing correction for custom vocabulary
 
-**Branch**: `feature/correction-layer`
+**Branch**: `feature/midori-v1` (current branch)
 
-**Chunks**:
+---
 
-### Chunk 2.1: Create CorrectionLayer
+### **LEARNINGS FROM FIRST ATTEMPT (2025-11-18)**
+
+**Mistake**: Split the core correction logic into artificial chunks (basic replacement → case preservation → word boundaries). This created a broken intermediate state.
+
+**Key Insight**: The correction logic must be built as a complete unit because:
+- Simple `replacingOccurrences()` without word boundaries is dangerously broken ("clawed" matches "unclawed")
+- Case preservation isn't a "nice to have" - it's essential ("CLAWED" should become "CLAUDE", not "Claude")
+- These features are interdependent and can't be meaningfully separated
+
+**Corrected Approach**: Build the core correction engine in one chunk with all essential features, then add persistence and integration separately.
+
+---
+
+**Chunks** (REVISED):
+
+### Chunk 2.1: Create Complete CorrectionLayer Core
 - New file: `CorrectionLayer.swift`
-- Implement dictionary-based text replacement
-- Support case-insensitive matching with case preservation
-- Support multi-word phrase corrections
-- Simple and efficient string processing
+- Implement dictionary-based text replacement WITH:
+  - ✅ Word boundary detection (regex with `\b`)
+  - ✅ Case-insensitive matching
+  - ✅ Case preservation (all-caps → all-caps, capitalized → capitalized)
+  - ✅ Multi-word phrase support
+- Basic API: `addCorrection()`, `removeCorrection()`, `getAllCorrections()`, `clearAll()`, `apply(to:)`
+- **Lines**: ~120-150 lines
+- **Test inline**: "clawed" → "Claude", "CLAWED" → "CLAUDE", "unclawed" stays "unclawed"
 
 ### Chunk 2.2: Add Persistence
-- Store corrections dictionary to disk
-- Use UserDefaults or JSON file
-- Load corrections on app startup
+- Store corrections dictionary to disk (UserDefaults with JSON encoding)
+- Load corrections on init
 - Save corrections when modified
+- **Lines**: +30 lines
+- **Test**: Add correction, restart app, verify it persists
 
 ### Chunk 2.3: Integrate with AppDelegate
-- Apply corrections to TranscriptionManager output
-- Insert CorrectionLayer after transcription completes
-- Keep same text injection flow
+- Create `CorrectionLayer` instance in AppDelegate
+- Apply corrections after `transcriptionManager.transcribe()` completes
+- Insert between transcription and text injection
+- **Lines**: ~10 lines modified in midoriApp.swift
+- **Test**: Add correction programmatically, record audio, verify correction works
 
-### Chunk 2.4: Test Corrections
-- Test basic word replacement
-- Test case preservation
-- Test multi-word phrases
-- Verify persistence across restarts
+### Chunk 2.4: End-to-End Testing
+- Test multiple corrections
+- Test edge cases (overlapping phrases, punctuation)
+- Test persistence across restarts
+- Verify no performance impact
 
 **Success Criteria**:
 - ✅ CorrectionLayer applies corrections accurately
+- ✅ Word boundaries work (doesn't break compound words)
+- ✅ Case preservation works correctly
 - ✅ Corrections persist across app restarts
-- ✅ Case-insensitive matching works
 - ✅ Multi-word phrase corrections work
+- ✅ Integration with transcription pipeline works seamlessly
 
 ---
 
