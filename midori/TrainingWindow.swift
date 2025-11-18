@@ -282,11 +282,15 @@ struct TrainingView: View {
                         // Add training sample
                         let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
                         if !cleanedText.isEmpty {
-                            // Check if this variant already exists (ignoring case and punctuation)
-                            let normalizedText = cleanedText.lowercased().components(separatedBy: CharacterSet.punctuationCharacters).joined()
+                            // Normalize: lowercase and remove punctuation
+                            let normalizedText = cleanedText.lowercased()
+                                .components(separatedBy: CharacterSet.punctuationCharacters)
+                                .joined()
+                                .trimmingCharacters(in: .whitespaces)
+
+                            // Check if this variant already exists (entries are already normalized)
                             let exists = trainingSamples.contains {
-                                let normalizedExisting = $0.incorrect.lowercased().components(separatedBy: CharacterSet.punctuationCharacters).joined()
-                                return normalizedExisting == normalizedText
+                                return $0.incorrect == normalizedText
                             }
 
                             if exists {

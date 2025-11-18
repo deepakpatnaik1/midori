@@ -37,8 +37,19 @@ class DictionaryManager: ObservableObject {
     }
 
     func addSample(incorrect: String, correct: String) {
-        trainingSamples.append((incorrect: incorrect, correct: correct))
+        // Normalize: lowercase and remove punctuation
+        let normalizedIncorrect = normalizeText(incorrect)
+        let normalizedCorrect = normalizeText(correct)
+        trainingSamples.append((incorrect: normalizedIncorrect, correct: normalizedCorrect))
         saveSamples()
+    }
+
+    /// Normalize text by lowercasing and removing punctuation
+    private func normalizeText(_ text: String) -> String {
+        return text.lowercased()
+            .components(separatedBy: CharacterSet.punctuationCharacters)
+            .joined()
+            .trimmingCharacters(in: .whitespaces)
     }
 
     func removeSample(at index: Int) {
