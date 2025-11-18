@@ -55,10 +55,15 @@ class TrainingWindow {
 }
 
 struct TrainingView: View {
-    @State private var trainingSamples: [(incorrect: String, correct: String)] = []
+    @ObservedObject private var dictionaryManager = DictionaryManager.shared
     @State private var targetPhrase: String = ""
     @State private var isTraining: Bool = false
     @State private var trainingProgress: String = ""
+    @State private var recordingTimer: DispatchWorkItem?
+    @State private var statusMessage: String = ""
+    @State private var consecutiveExists: Int = 0
+
+    @Environment(\.dismiss) private var dismiss
 
     private weak var audioRecorder: AudioRecorder?
     private weak var transcriptionManager: TranscriptionManager?
@@ -66,6 +71,10 @@ struct TrainingView: View {
     init(audioRecorder: AudioRecorder?, transcriptionManager: TranscriptionManager?) {
         self.audioRecorder = audioRecorder
         self.transcriptionManager = transcriptionManager
+    }
+
+    private var trainingSamples: [(incorrect: String, correct: String)] {
+        dictionaryManager.trainingSamples
     }
 
     var body: some View {
@@ -96,23 +105,45 @@ struct TrainingView: View {
                     .cornerRadius(6)
                     .disabled(isTraining)
 
-                Button(action: startTraining) {
-                    HStack(spacing: 6) {
-                        if isTraining {
-                            ProgressView()
-                                .scaleEffect(0.6)
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        }
-                        Text(isTraining ? trainingProgress : "Start Training")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundColor(.white)
-                    .frame(width: 140, height: 28)
-                    .background(buttonColor())
-                    .cornerRadius(6)
+                // Status message
+                if !statusMessage.isEmpty {
+                    Text(statusMessage)
+                        .font(.system(size: 10))
+                        .foregroundColor(statusMessage.contains("New variant") ? .green : .orange)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.plain)
-                .disabled(targetPhrase.isEmpty || isTraining)
+
+                HStack(spacing: 8) {
+                    Button(action: startTraining) {
+                        HStack(spacing: 6) {
+                            if isTraining {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            }
+                            Text(isTraining ? trainingProgress : "Start Training")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .frame(width: 140, height: 28)
+                        .background(buttonColor())
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(targetPhrase.isEmpty || isTraining)
+
+                    if isTraining {
+                        Button(action: cancelTraining) {
+                            Text("Cancel")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white)
+                                .frame(width: 70, height: 28)
+                                .background(Color.red)
+                                .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
             .padding(16)
 
@@ -179,15 +210,42 @@ struct TrainingView: View {
                     }
                 }
             }
+
+            Divider()
+
+            // Bottom action buttons
+            HStack(spacing: 12) {
+                Button(action: handleCancel) {
+                    Text("Cancel")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 80, height: 28)
+                        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button(action: handleOK) {
+                    Text("OK")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 80, height: 28)
+                        .background(Color.blue)
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
         .frame(width: 600, height: 500)
         .preferredColorScheme(.dark)
-        .onAppear(perform: loadTrainingSamples)
     }
 
     private func loadTrainingSamples() {
-        // TODO: Load from persistent storage when implemented
-        trainingSamples = []
+        // Samples are automatically loaded from DictionaryManager.shared
     }
 
     private func startTraining() {
@@ -201,8 +259,8 @@ struct TrainingView: View {
         // Start recording
         recorder.startRecording()
 
-        // Record for 3 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+        // Create timer for 3 seconds
+        let timer = DispatchWorkItem { [self] in
             trainingProgress = "Processing..."
             recorder.stopRecording()
 
@@ -217,28 +275,85 @@ struct TrainingView: View {
                 DispatchQueue.main.async {
                     isTraining = false
                     trainingProgress = ""
+                    recordingTimer = nil
 
                     switch result {
                     case .success(let text):
                         // Add training sample
                         let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
                         if !cleanedText.isEmpty {
-                            trainingSamples.append((incorrect: cleanedText, correct: targetPhrase))
-                            // TODO: Save to persistent storage
-                            print("✓ Training sample added: '\(cleanedText)' -> '\(targetPhrase)'")
+                            // Check if this variant already exists (ignoring case and punctuation)
+                            let normalizedText = cleanedText.lowercased().components(separatedBy: CharacterSet.punctuationCharacters).joined()
+                            let exists = trainingSamples.contains {
+                                let normalizedExisting = $0.incorrect.lowercased().components(separatedBy: CharacterSet.punctuationCharacters).joined()
+                                return normalizedExisting == normalizedText
+                            }
+
+                            if exists {
+                                consecutiveExists += 1
+                                statusMessage = "Exists"
+                                print("⚠️ Training sample already exists: '\(cleanedText)'")
+
+                                // Auto-conclude after 3 consecutive "Exists"
+                                if consecutiveExists >= 3 {
+                                    print("✓ Training auto-concluded: 3 consecutive duplicates detected")
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                        // Reset for next word/phrase instead of closing
+                                        targetPhrase = ""
+                                        statusMessage = "Training concluded - ready for next phrase"
+                                        consecutiveExists = 0
+                                        // TODO: Save current samples to persistent storage
+                                    }
+                                }
+                            } else {
+                                consecutiveExists = 0
+                                statusMessage = "New variant added"
+                                dictionaryManager.addSample(incorrect: cleanedText, correct: targetPhrase)
+                                print("✓ Training sample added: '\(cleanedText)' -> '\(targetPhrase)'")
+                            }
                         }
 
                     case .failure(let error):
+                        statusMessage = "Transcription failed"
                         print("❌ Training transcription failed: \(error.localizedDescription)")
                     }
                 }
             }
         }
+
+        recordingTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: timer)
+    }
+
+    private func cancelTraining() {
+        // Cancel the timer
+        recordingTimer?.cancel()
+        recordingTimer = nil
+
+        // Stop recording
+        audioRecorder?.stopRecording()
+
+        // Reset state
+        isTraining = false
+        trainingProgress = ""
+
+        print("⚠️ Training cancelled by user")
+    }
+
+    private func handleCancel() {
+        // Discard all training samples and close window
+        dictionaryManager.clearAll()
+        NSApp.keyWindow?.close()
+    }
+
+    private func handleOK() {
+        // Training samples are already saved automatically
+        print("✓ Training concluded with \(trainingSamples.count) samples")
+        NSApp.keyWindow?.close()
     }
 
     private func deleteSample(at index: Int) {
-        // TODO: Remove from persistent storage when implemented
-        trainingSamples.remove(at: index)
+        dictionaryManager.removeSample(at: index)
     }
 
     private func buttonColor() -> Color {
