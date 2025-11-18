@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "BDEED7F02EBC80BA0003B899"
-               BuildableName = "midori.app"
+               BuildableName = "Midori.app"
                BlueprintName = "midori"
                ReferencedContainer = "container:midori.xcodeproj">
             </BuildableReference>
@@ -45,7 +45,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "BDEED7F02EBC80BA0003B899"
-            BuildableName = "midori.app"
+            BuildableName = "Midori.app"
             BlueprintName = "midori"
             ReferencedContainer = "container:midori.xcodeproj">
          </BuildableReference>
@@ -62,7 +62,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "BDEED7F02EBC80BA0003B899"
-            BuildableName = "midori.app"
+            BuildableName = "Midori.app"
             BlueprintName = "midori"
             ReferencedContainer = "container:midori.xcodeproj">
          </BuildableReference>

@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var audioRecorder: AudioRecorder?
     var waveformWindow: WaveformWindow?
     var transcriptionManager: TranscriptionManager?
+    var appleSpeechManager: AppleSpeechManager?
     var aboutWindow: AboutWindow?
 
     // Keep strong references to sound objects to prevent deallocation
@@ -53,6 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize managers
         audioRecorder = AudioRecorder()
         transcriptionManager = TranscriptionManager()
+        appleSpeechManager = AppleSpeechManager()
         waveformWindow = WaveformWindow()
         aboutWindow = AboutWindow()
 
@@ -236,7 +238,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Get audio data and transcribe
             if let audioData = self.audioRecorder?.getAudioData() {
                 print("📝 Transcribing audio...")
-                self.transcriptionManager?.transcribe(audioData: audioData) { [weak self] result in
+                print("🔍 TRANSCRIPTION FLOW HIT - audioData size: \(audioData.count) bytes")
+                self.appleSpeechManager?.transcribe(audioData: audioData) { [weak self] result in
                     DispatchQueue.main.async {
                         switch result {
                         case .success(let text):

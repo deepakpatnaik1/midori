@@ -271,6 +271,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Midori needs microphone access to record your voice for transcription.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Midori needs speech recognition to transcribe your voice to text.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -304,6 +305,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Midori needs microphone access to record your voice for transcription.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Midori needs speech recognition to transcribe your voice to text.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
