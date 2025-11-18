@@ -106,8 +106,12 @@ class TranscriptionManager {
 
             print("✓ Parakeet transcription complete: [REDACTED - \(result.text.count) characters]")
 
+            // Apply custom dictionary corrections
+            let correctedText = CorrectionLayer.shared.applyCorrections(to: result.text)
+            print("✓ Applied custom dictionary corrections")
+
             DispatchQueue.main.async {
-                completion(.success(result.text))
+                completion(.success(correctedText))
             }
         } catch {
             print("❌ Transcription failed: \(error.localizedDescription)")

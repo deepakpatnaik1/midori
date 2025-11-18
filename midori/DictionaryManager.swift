@@ -37,10 +37,10 @@ class DictionaryManager: ObservableObject {
     }
 
     func addSample(incorrect: String, correct: String) {
-        // Normalize: lowercase and remove punctuation
+        // Normalize only the incorrect variant for matching
+        // Keep correct phrase exactly as user typed it (preserves capitalization)
         let normalizedIncorrect = normalizeText(incorrect)
-        let normalizedCorrect = normalizeText(correct)
-        trainingSamples.append((incorrect: normalizedIncorrect, correct: normalizedCorrect))
+        trainingSamples.append((incorrect: normalizedIncorrect, correct: correct))
         saveSamples()
     }
 
