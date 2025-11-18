@@ -237,6 +237,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func applySentenceCase(_ text: String) -> String {
+        // Trim whitespace
+        var result = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Return empty string if text is empty
+        guard !result.isEmpty else { return "" }
+
+        // Capitalize first letter
+        result = result.prefix(1).uppercased() + result.dropFirst()
+
+        // Add period at the end if not already present
+        let punctuation: Set<Character> = [".", "!", "?"]
+        if !punctuation.contains(result.last!) {
+            result += "."
+        }
+
+        // Add space after the sentence
+        result += " "
+
+        return result
+    }
+
     private func injectText(_ text: String) {
         // Check accessibility permissions
         let trusted = AXIsProcessTrusted()
@@ -248,17 +270,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Add a space after the text for proper sentence separation
-        let textWithSpace = text + " "
+        // Apply sentence case formatting: capitalize first letter, add period and space
+        let formattedText = applySentenceCase(text)
 
-        print("📋 Setting pasteboard: [REDACTED - \(textWithSpace.count) characters]")
+        print("📋 Setting pasteboard: [REDACTED - \(formattedText.count) characters]")
 
         // Inject text using pasteboard and Cmd+V simulation
         let pasteboard = NSPasteboard.general
         let changeCount = pasteboard.changeCount
 
         pasteboard.clearContents()
-        pasteboard.setString(textWithSpace, forType: .string)
+        pasteboard.setString(formattedText, forType: .string)
 
         // Verify pasteboard was set correctly
         print("✓ Pasteboard set (change count: \(changeCount) -> \(pasteboard.changeCount))")
