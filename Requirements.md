@@ -104,12 +104,11 @@ The menu bar should have **four buttons**:
 9. Finally, I manually write down what I want the app to actually transcribe
 
 ### Technical Approach
-- Use **Apple Speech Framework** (macOS 14+) with custom vocabulary support
-- Leverage `prepareCustomLanguageModel` API
-- Provide multiple audio samples (ML training data)
-- Provide ground truth text (correct transcription)
-- Apple's API handles the ML training
-- Custom vocabulary integrates directly into recognition (single unified layer)
+- Continue using **NVIDIA Parakeet V2** for transcription (better quality than Apple Speech)
+- Add **post-processing correction layer** for custom vocabulary
+- Dictionary-based text replacement (e.g., "clawed" → "Claude")
+- User provides sample transcriptions and correct spellings
+- Simple, effective approach for fixing common mistakes
 - Fully on-device, works offline, no network required
 
 ---
@@ -180,15 +179,16 @@ The menu bar should have **four buttons**:
 - Modern Swift patterns (async/await, actors, etc.)
 
 ### Transcription Engine
-- **Apple Speech Framework** (replacing NVIDIA Parakeet V2)
-- Better accuracy than Parakeet V2 (5-10% WER vs 11-12% WER)
-- Built-in custom vocabulary support via `prepareCustomLanguageModel`
+- **NVIDIA Parakeet V2** (via FluidAudio)
+- Better quality than Apple Speech Framework in real-world testing
+- Custom vocabulary via post-processing correction layer
 - Fully on-device processing (privacy-focused)
-- Free (no API costs or rate limits for on-device recognition)
-- Native macOS integration
+- Free (no API costs or rate limits)
+- CoreML integration
 
 ### Key Technologies
-- **Speech Framework** - Transcription with custom vocabulary
+- **FluidAudio** - Parakeet V2 integration
+- **CoreML** - Neural network inference
 - **SwiftUI** - Waveform visualization and training UI
 - **AppKit** - Menu bar integration, key monitoring
 - **AVFoundation** - Audio recording
@@ -223,14 +223,13 @@ The menu bar should have **four buttons**:
 
 ---
 
-## Migration from Parakeet V2 to Apple Speech Framework
+## Custom Vocabulary Implementation
 
-### Why Switch?
-1. **Better accuracy** - Apple: 5-10% WER, Parakeet: 11-12% WER
-2. **Built-in custom vocabulary** - Solves the "Claude" problem natively
-3. **Native integration** - No external dependencies (FluidAudio)
-4. **Free and unlimited** - No API costs, on-device processing
-5. **Simpler architecture** - One unified system vs. separate correction layer
+### Why Post-Processing Correction Layer?
+1. **Better base quality** - Parakeet V2 provides superior transcription quality in testing
+2. **Simpler implementation** - Dictionary-based corrections easier to build and debug
+3. **Keep FluidAudio** - Maintain existing proven transcription pipeline
+4. **Flexible corrections** - Easy to add/edit/remove corrections through UI
 
 ### What We Keep
 - Same UX and waveform design
@@ -238,12 +237,13 @@ The menu bar should have **four buttons**:
 - Right Command key trigger
 - Auto-launch behavior
 - Text injection mechanism
+- Parakeet V2 transcription engine
+- FluidAudio dependency
 
-### What Changes
-- Replace `TranscriptionManager` to use Apple Speech Framework
-- Remove FluidAudio dependency
-- Add custom language model training workflow
-- Build training UI for custom dictionary
+### What We Add
+- `CorrectionLayer` for post-processing text replacements
+- Training UI for managing correction dictionary
+- Persistence for user corrections
 
 ---
 

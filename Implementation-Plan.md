@@ -47,43 +47,43 @@ This is a high-level, chunk-by-chunk plan to transform Midori from its current s
 
 ---
 
-## Phase 2: Replace Transcription Engine
+## Phase 2: Implement Correction Layer
 
-**Goal**: Switch from Parakeet V2 to Apple Speech Framework
+**Goal**: Add post-processing correction for custom vocabulary
 
-**Branch**: `feature/apple-speech`
+**Branch**: `feature/correction-layer`
 
 **Chunks**:
 
-### Chunk 2.1: Create AppleSpeechManager
-- New file: `AppleSpeechManager.swift`
-- Implement `SFSpeechRecognizer` setup
-- Implement basic transcription (no custom vocab yet)
-- Handle audio buffer processing
-- Return transcribed text via callback
+### Chunk 2.1: Create CorrectionLayer
+- New file: `CorrectionLayer.swift`
+- Implement dictionary-based text replacement
+- Support case-insensitive matching with case preservation
+- Support multi-word phrase corrections
+- Simple and efficient string processing
 
-### Chunk 2.2: Integrate with AppDelegate
-- Replace `TranscriptionManager` with `AppleSpeechManager`
-- Update initialization in `applicationDidFinishLaunching`
-- Update transcription call in `stopRecording()`
-- Keep same callback interface
+### Chunk 2.2: Add Persistence
+- Store corrections dictionary to disk
+- Use UserDefaults or JSON file
+- Load corrections on app startup
+- Save corrections when modified
 
-### Chunk 2.3: Test & Compare
-- Test transcription accuracy
-- Compare speed vs Parakeet V2
-- Verify no regressions
+### Chunk 2.3: Integrate with AppDelegate
+- Apply corrections to TranscriptionManager output
+- Insert CorrectionLayer after transcription completes
+- Keep same text injection flow
 
-### Chunk 2.4: Remove FluidAudio
-- Delete `TranscriptionManager.swift`
-- Delete `FluidAudio-Local/` directory
-- Remove from Package.swift dependencies
-- Clean build and verify
+### Chunk 2.4: Test Corrections
+- Test basic word replacement
+- Test case preservation
+- Test multi-word phrases
+- Verify persistence across restarts
 
 **Success Criteria**:
-- ✅ Transcription works with Apple Speech
-- ✅ Accuracy equal or better than Parakeet
-- ✅ Speed acceptable (< 5s for 1min audio)
-- ✅ No FluidAudio dependency
+- ✅ CorrectionLayer applies corrections accurately
+- ✅ Corrections persist across app restarts
+- ✅ Case-insensitive matching works
+- ✅ Multi-word phrase corrections work
 
 ---
 
@@ -131,69 +131,56 @@ This is a high-level, chunk-by-chunk plan to transform Midori from its current s
 
 ---
 
-## Phase 4: Custom Dictionary Training
+## Phase 4: Custom Dictionary UI
 
-**Goal**: Implement custom vocabulary learning
+**Goal**: Implement UI for managing corrections
 
-**Branch**: `feature/custom-dictionary`
+**Branch**: `feature/custom-dictionary-ui`
 
 **Chunks**:
 
-### Chunk 4.1: Create CustomLanguageModelManager
-- New file: `CustomLanguageModelManager.swift`
-- Store training audio samples
-- Store ground truth text corrections
-- Build `SFCustomLanguageModelData`
-- Call `prepareCustomLanguageModel()`
-- Save/load trained models from disk
+### Chunk 4.1: Create Training UI - Data Model
+- Create data structures for corrections
+- Each correction has: sample transcription + correct text
+- Persistence layer (integrate with CorrectionLayer)
 
-### Chunk 4.2: Create Training UI - Data Model
-- Create data structures for training phrases
-- Each phrase has: multiple audio samples + ground truth
-- Persistence layer (save/load training data)
-
-### Chunk 4.3: Create Training UI - Window & Layout
+### Chunk 4.2: Create Training UI - Window & Layout
 - New file: `TrainingWindow.swift`
 - Create NSWindow for training
 - Basic layout structure
 
-### Chunk 4.4: Create Training UI - Recording Interface
+### Chunk 4.3: Create Training UI - Correction Interface
 - New file: `TrainingView.swift`
-- Plus button to add new phrase
-- List of training phrases
-- Record button for each sample
-- Show live transcription
-- Mini plus to add more samples
-- Text field for ground truth
+- Plus button to add new correction
+- List of corrections
+- Record button to capture sample
+- Show what Parakeet transcribes
+- Text field for correct text
 - Save/Delete buttons
 
-### Chunk 4.5: Integrate Recording into Training
-- Reuse AudioRecorder for training samples
-- Store audio buffers for training
-- Show what model currently transcribes
+### Chunk 4.4: Integrate Recording into Training
+- Reuse AudioRecorder for test samples
+- Show live transcription from Parakeet
+- Let user see what needs correcting
 
-### Chunk 4.6: Build Custom Language Model
-- Trigger model building from training data
-- Show progress indicator (can take time)
-- Save model file location
+### Chunk 4.5: Connect to CorrectionLayer
+- Save new corrections to CorrectionLayer
+- Update corrections when edited
+- Delete corrections when removed
+- Trigger CorrectionLayer reload
 
-### Chunk 4.7: Integrate with AppleSpeechManager
-- Load custom language model
-- Attach to speech recognition requests
-- Verify custom words are recognized
-
-### Chunk 4.8: Add Train Menu Item
+### Chunk 4.6: Add Train Menu Item
 - Add "Train" button to menu bar in AppDelegate
 - Opens training window
 - Test end-to-end flow
 
 **Success Criteria**:
 - ✅ Train menu opens training UI
-- ✅ Can record multiple samples of phrase
-- ✅ Can provide ground truth text
-- ✅ Model builds successfully
-- ✅ "Claude" transcribes correctly after training
-- ✅ Trained model persists across restarts
+- ✅ Can add new corrections easily
+- ✅ Can see what Parakeet transcribes
+- ✅ Can provide correct text
+- ✅ "Claude" corrects properly after adding
+- ✅ Corrections persist across restarts
 
 ---
 
@@ -250,27 +237,27 @@ This is a high-level, chunk-by-chunk plan to transform Midori from its current s
 **Estimated Time**: 2-4 hours of focused work
 **Risk**: Medium-High
 
-### Phase 2: Replace Transcription Engine
-**Complexity**: Medium (new API but well documented)
-**Estimated Time**: 2-3 hours
-**Risk**: Medium
+### Phase 2: Implement Correction Layer
+**Complexity**: Low (simple string processing)
+**Estimated Time**: 1-2 hours
+**Risk**: Low
 
 ### Phase 3: UI/UX Improvements
 **Complexity**: Low-Medium (mostly tweaks)
 **Estimated Time**: 1-2 hours
 **Risk**: Low
 
-### Phase 4: Custom Dictionary Training
-**Complexity**: Medium-High (most code to write)
-**Estimated Time**: 4-6 hours
-**Risk**: Medium
+### Phase 4: Custom Dictionary UI
+**Complexity**: Medium (UI development)
+**Estimated Time**: 3-4 hours
+**Risk**: Low-Medium
 
 ### Phase 5: Polish & Release
 **Complexity**: Low (cleanup and testing)
 **Estimated Time**: 1-2 hours
 **Risk**: Low
 
-**Total Estimated Time**: 10-17 hours of focused development
+**Total Estimated Time**: 8-14 hours of focused development
 
 ---
 
@@ -279,18 +266,18 @@ This is a high-level, chunk-by-chunk plan to transform Midori from its current s
 ```
 Phase 1 (Stability)
     ↓
-Phase 2 (Apple Speech) ← Must have stable audio first
+Phase 2 (Correction Layer) ← Can start after Phase 1
     ↓
-Phase 3 (UX) ← Can start anytime, but easier after Phase 2
+Phase 3 (UX) ← Can start anytime, independent
     ↓
-Phase 4 (Custom Dictionary) ← Requires Phase 2 complete
+Phase 4 (Custom Dictionary UI) ← Requires Phase 2 complete
     ↓
 Phase 5 (Polish)
 ```
 
-**Phases 1 and 2 are sequential** (must be done in order)
-**Phase 3 can be done anytime** (independent of transcription)
-**Phase 4 requires Phase 2** (needs Apple Speech Framework)
+**Phase 1 must be done first** (foundation for stability)
+**Phase 2 and 3 can be done in parallel** (different files, independent)
+**Phase 4 requires Phase 2** (needs CorrectionLayer functionality)
 
 ---
 
@@ -311,7 +298,7 @@ If we want to go faster, we can work on multiple phases concurrently:
 
 ### Scenario 3: Aggressive Parallelization
 - Phase 1 + Phase 3 concurrently
-- Phase 2 + Phase 4.1-4.2 concurrently (build UI while transcription is in progress)
+- Phase 2 + Phase 4.1-4.2 concurrently (build UI skeleton while correction layer is in progress)
 - Higher risk, faster completion
 
 **Recommendation**: Start with Scenario 1 (slow & safe) for Phase 1. If it goes smoothly, consider parallelization for later phases.
@@ -347,10 +334,8 @@ If we want to go faster, we can work on multiple phases concurrently:
 - ✏️ `AudioRecorder.swift` (major fixes)
 
 ### Phase 2
-- ➕ `AppleSpeechManager.swift` (new)
-- ✏️ `midoriApp.swift` (minor - swap managers)
-- ❌ `TranscriptionManager.swift` (delete)
-- ❌ `FluidAudio-Local/` (delete)
+- ➕ `CorrectionLayer.swift` (new)
+- ✏️ `midoriApp.swift` (minor - integrate correction layer)
 
 ### Phase 3
 - ✏️ `WaveformView.swift` (minor - base state)
@@ -358,11 +343,10 @@ If we want to go faster, we can work on multiple phases concurrently:
 - ➕ `AboutWindow.swift` (new)
 
 ### Phase 4
-- ➕ `CustomLanguageModelManager.swift` (new)
 - ➕ `TrainingWindow.swift` (new)
 - ➕ `TrainingView.swift` (new)
 - ✏️ `midoriApp.swift` (minor - Train menu item)
-- ✏️ `AppleSpeechManager.swift` (minor - load custom model)
+- ✏️ `CorrectionLayer.swift` (minor - UI integration)
 
 ### Phase 5
 - 📝 Documentation updates

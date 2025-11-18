@@ -162,11 +162,11 @@ let result = try await manager.transcribe(samples)
 **Issues**:
 - ⚠️ Async initialization might not be ready on first use
 - ⚠️ Simple downsampling (stride) - no proper resampling filter
-- ⚠️ No custom vocabulary support
+- ⚠️ No custom vocabulary support (will need separate correction layer)
 - ⚠️ External dependency (FluidAudio-Local package)
 - ⚠️ 500ms sleep while waiting for init (line 81) is hacky
 
-**Verdict**: 🔄 **REPLACE ENTIRELY** with Apple Speech Framework
+**Verdict**: ✅ **KEEP** - Parakeet V2 provides better quality than Apple Speech Framework
 
 ---
 
@@ -386,15 +386,15 @@ let format = input.outputFormat(forBus: 0)
   │       │        │           │
   ▼       ▼        ▼           ▼
 ┌────┐ ┌────┐  ┌─────┐  ┌──────────────┐
-│Key │ │Audio│  │Wave │  │AppleSpeech   │
+│Key │ │Audio│  │Wave │  │Transcription │
 │Mon │ │Rec  │  │form │  │Manager       │
-│    │ │(NEW)│  │(UPD)│  │(NEW)         │
+│    │ │(UPD)│  │(UPD)│  │(Parakeet V2) │
 └────┘ └────┘  └─────┘  └──────────────┘
                              │
                              ▼
                     ┌─────────────────┐
-                    │CustomLanguage   │
-                    │ModelManager     │
+                    │Correction       │
+                    │Layer            │
                     │(NEW)            │
                     └─────────────────┘
                              │
@@ -479,64 +479,59 @@ let format = input.outputFormat(forBus: 0)
 
 ---
 
-#### 🔄 COMPLETE REPLACEMENT
+#### 🔄 IMPROVEMENTS TO EXISTING COMPONENT
 
-##### TranscriptionManager.swift → AppleSpeechManager.swift
-**Remove**:
+##### TranscriptionManager.swift (Keep with Parakeet V2)
+**Keep**:
 - FluidAudio import and usage
 - Parakeet V2 model loading
 - Audio downsampling to 16kHz
-- Async model initialization
+- Core transcription functionality
 
-**New Implementation**:
-```swift
-import Speech
+**Potential Improvements**:
+- Better async initialization handling
+- Improved resampling filter (replace simple stride)
+- Error handling improvements
 
-class AppleSpeechManager {
-    private var recognizer: SFSpeechRecognizer?
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var recognitionTask: SFSpeechRecognitionTask?
-    private var customLanguageModel: SFSpeechLanguageModel?
-
-    func transcribe(audioData: Data, completion: @escaping (Result<String, Error>) -> Void)
-    func loadCustomLanguageModel(url: URL)
-}
-```
-
-**Lines to Write**: ~200 lines (new file)
-**Risk**: Medium (new API, need to learn)
+**Lines to Modify**: ~30 lines (optimizations)
+**Risk**: Low
 
 ---
 
 #### 🆕 NEW COMPONENTS
 
-##### CustomLanguageModelManager.swift
-**Purpose**: Manage custom vocabulary training and models
+##### CorrectionLayer.swift
+**Purpose**: Post-processing correction layer for Parakeet V2 transcriptions
 
 **Responsibilities**:
-- Store training audio samples
-- Store ground truth text corrections
-- Build training data using `SFCustomLanguageModelData`
-- Call `prepareCustomLanguageModel()`
-- Manage model files on disk
-- Load/unload custom models
+- Store user-defined word/phrase corrections
+- Apply corrections to transcribed text
+- Simple string replacement or fuzzy matching
+- Manage corrections dictionary on disk
+- Load/save user corrections
+
+**Implementation Approach**:
+- Dictionary-based replacements (e.g., "clawed" → "Claude")
+- Case-insensitive matching with case preservation
+- Support for multi-word phrase corrections
+- Persistent storage in user defaults or JSON file
 
 **Lines to Write**: ~150 lines
-**Risk**: Medium
+**Risk**: Low
 
 ##### TrainingWindow.swift + TrainingView.swift
-**Purpose**: SwiftUI UI for custom dictionary training
+**Purpose**: SwiftUI UI for managing custom word corrections
 
 **Features**:
-- Plus button to add new training phrase
-- Record button for each sample (play icon)
-- Show live transcription of what model thinks
-- Mini plus to add more samples
-- Text field for ground truth correction
+- Plus button to add new correction
+- Record button to capture sample (play icon)
+- Show live transcription of what Parakeet thinks
+- Text field for correct spelling/transcription
 - Save/Delete buttons
-- List of all trained phrases
+- List of all corrections
+- Simple interface for building correction dictionary
 
-**Lines to Write**: ~300 lines
+**Lines to Write**: ~250 lines
 **Risk**: Low (UI is straightforward)
 
 ##### AboutWindow.swift
@@ -567,18 +562,18 @@ class AppleSpeechManager {
 
 **Testing**: Verify no crashes, works with AirPods
 
-### Phase 2: Replace Transcription Engine
-**Goal**: Switch from Parakeet V2 to Apple Speech Framework
-**Focus**: Create AppleSpeechManager.swift
+### Phase 2: Implement Correction Layer
+**Goal**: Add post-processing correction for custom vocabulary
+**Focus**: Create CorrectionLayer.swift
 
 **Tasks**:
-1. Create new AppleSpeechManager
-2. Implement basic transcription (no custom vocab yet)
-3. Replace TranscriptionManager usage in AppDelegate
-4. Test accuracy and performance
-5. Remove FluidAudio dependency
+1. Create new CorrectionLayer component
+2. Implement dictionary-based text replacement
+3. Integrate with TranscriptionManager output
+4. Add persistence for user corrections
+5. Test correction accuracy
 
-**Testing**: Verify transcription works, compare accuracy
+**Testing**: Verify corrections work, test edge cases
 
 ### Phase 3: UI/UX Improvements
 **Goal**: Match desired user experience
@@ -593,18 +588,18 @@ class AppleSpeechManager {
 
 **Testing**: Verify UX matches requirements exactly
 
-### Phase 4: Custom Dictionary
-**Goal**: Implement custom vocabulary training
-**Focus**: New components
+### Phase 4: Custom Dictionary UI
+**Goal**: Implement UI for managing corrections
+**Focus**: TrainingWindow + TrainingView
 
 **Tasks**:
-1. Create CustomLanguageModelManager
-2. Create TrainingWindow + TrainingView
-3. Integrate with AppleSpeechManager
+1. Create TrainingWindow + TrainingView
+2. Implement correction entry UI
+3. Integrate with CorrectionLayer
 4. Add "Train" menu item
-5. Test end-to-end training flow
+5. Test end-to-end correction flow
 
-**Testing**: Train "Claude" and verify it works
+**Testing**: Add "Claude" correction and verify it works
 
 ---
 
@@ -639,10 +634,10 @@ class AppleSpeechManager {
 - [ ] No memory leaks (tested with Instruments)
 
 ### Phase 2 Success
-- [ ] Apple Speech Framework transcribes accurately
-- [ ] Transcription speed acceptable (< 5 seconds for 1-minute audio)
-- [ ] FluidAudio completely removed from project
-- [ ] Build size reduced (no more 17MB models)
+- [ ] CorrectionLayer applies corrections accurately
+- [ ] Corrections persist across app restarts
+- [ ] Case-insensitive matching works
+- [ ] Multi-word phrase corrections work
 
 ### Phase 3 Success
 - [ ] Waveform appears instantly in base state
@@ -653,10 +648,10 @@ class AppleSpeechManager {
 
 ### Phase 4 Success
 - [ ] Training UI functional and intuitive
-- [ ] "Claude" transcribes correctly after training
-- [ ] Custom model persists across app restarts
-- [ ] Training multiple phrases works
-- [ ] Can edit/delete trained phrases
+- [ ] "Claude" corrects to proper spelling after adding correction
+- [ ] Corrections persist across app restarts
+- [ ] Multiple corrections work
+- [ ] Can edit/delete corrections
 
 ---
 
@@ -669,11 +664,11 @@ midori/
 │   ├── midoriApp.swift (350 lines)
 │   ├── KeyMonitor.swift (69 lines)
 │   ├── AudioRecorder.swift (239 lines)
-│   ├── TranscriptionManager.swift (147 lines) ← DELETE
+│   ├── TranscriptionManager.swift (147 lines) ← KEEP
 │   ├── WaveformView.swift (166 lines)
 │   ├── WaveformWindow.swift (129 lines)
 │   └── ContentView.swift (unused)
-├── FluidAudio-Local/ ← DELETE ENTIRE DIRECTORY
+├── FluidAudio-Local/ ← KEEP (Parakeet V2 dependency)
 └── Requirements.md
 ```
 
@@ -684,27 +679,28 @@ midori/
 │   ├── midoriApp.swift (350 lines, ~50 modified)
 │   ├── KeyMonitor.swift (69 lines, no changes)
 │   ├── AudioRecorder.swift (239 lines, ~80 modified)
-│   ├── AppleSpeechManager.swift (200 lines) ← NEW
-│   ├── CustomLanguageModelManager.swift (150 lines) ← NEW
+│   ├── TranscriptionManager.swift (147 lines, ~30 modified)
+│   ├── CorrectionLayer.swift (150 lines) ← NEW
 │   ├── WaveformView.swift (166 lines, ~10 modified)
 │   ├── WaveformWindow.swift (129 lines, no changes)
 │   ├── TrainingWindow.swift (100 lines) ← NEW
-│   ├── TrainingView.swift (200 lines) ← NEW
+│   ├── TrainingView.swift (150 lines) ← NEW
 │   └── AboutWindow.swift (50 lines) ← NEW
+├── FluidAudio-Local/ ← KEEP
 ├── Requirements.md
 └── Architecture.md (this file)
 ```
 
 ### Total Line Count
 - **Current**: ~1100 lines of Swift
-- **Future**: ~1400 lines of Swift
-- **Net Change**: +300 lines (mostly new features)
+- **Future**: ~1350 lines of Swift
+- **Net Change**: +250 lines (mostly new features)
 
 ---
 
 ## Dependencies Comparison
 
-### Current (AS-IS)
+### Current (AS-IS) and Future (SHOULD-BE)
 ```swift
 // Package.swift
 dependencies: [
@@ -712,35 +708,26 @@ dependencies: [
 ]
 ```
 
-### Future (SHOULD-BE)
-```swift
-// Package.swift
-dependencies: [
-    // No external dependencies!
-]
-```
-
-**All native Apple frameworks**:
-- Speech (new)
-- SwiftUI
-- AppKit
-- AVFoundation
-- ServiceManagement
+**Apple frameworks**:
+- SwiftUI - UI and waveform
+- AppKit - Menu bar, windows, events
+- AVFoundation - Audio recording
+- ServiceManagement - Auto-launch at login
 
 ---
 
-## Build Configuration Changes
+## Build Configuration
 
-### Current Issues
+### Current Configuration
 - Debug-only builds (Release breaks FluidAudio)
-- Large app size (~17MB)
-- External model downloads required
+- App size (~17MB with Parakeet V2 models)
+- External model downloads from HuggingFace
+- FluidAudio dependency required
 
-### Future Benefits
-- Can use Release builds (no FluidAudio constraints)
-- Smaller app size (~5MB estimated)
-- No external downloads (Apple's models are system-wide)
-- Faster build times (no FluidAudio compilation)
+### No Changes Planned
+- Continue using Debug builds
+- Keep FluidAudio dependency
+- Maintain existing build configuration
 
 ---
 
