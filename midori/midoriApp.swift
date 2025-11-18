@@ -7,7 +7,6 @@
 
 import SwiftUI
 import AppKit
-import ServiceManagement
 import AudioToolbox
 
 @main
@@ -45,9 +44,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hide dock icon (LSUIElement handles this, but ensure no window appears)
         NSApp.setActivationPolicy(.accessory)
 
-        // Enable launch at login
-        enableLaunchAtLogin()
-
         // Create menu bar status item
         setupMenuBar()
 
@@ -72,15 +68,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("✓ Midori ready - Press Right Command to start recording")
     }
 
-    private func enableLaunchAtLogin() {
-        do {
-            try SMAppService.mainApp.register()
-            print("✓ Launch at login enabled")
-        } catch {
-            print("⚠️ Failed to enable launch at login: \(error.localizedDescription)")
-        }
-    }
-
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
@@ -94,11 +81,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Add About menu item
         menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
-
-        // Add launch at login toggle
-        let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "l")
-        launchAtLoginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(launchAtLoginItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Restart", action: #selector(restart), keyEquivalent: "r"))
@@ -324,27 +306,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showAbout() {
         print("ℹ️ Showing About window")
         aboutWindow?.show()
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        let service = SMAppService.mainApp
-        do {
-            if service.status == .enabled {
-                try service.unregister()
-                print("✓ Launch at login disabled")
-            } else {
-                try service.register()
-                print("✓ Launch at login enabled")
-            }
-            // Update menu checkmark
-            if let menu = statusItem?.menu,
-               let item = menu.item(withTitle: "Launch at Login") {
-                item.state = service.status == .enabled ? .on : .off
-            }
-        } catch {
-            print("❌ Failed to toggle launch at login: \(error.localizedDescription)")
-            showError("Failed to change launch at login setting: \(error.localizedDescription)")
-        }
     }
 
     @objc private func restart() {
