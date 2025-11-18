@@ -51,7 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioRecorder = AudioRecorder()
         transcriptionManager = TranscriptionManager()
         waveformWindow = WaveformWindow()
-        trainingWindow = TrainingWindow()
+        trainingWindow = TrainingWindow(audioRecorder: audioRecorder, transcriptionManager: transcriptionManager)
         aboutWindow = AboutWindow()
 
         // Setup audio recorder callback
