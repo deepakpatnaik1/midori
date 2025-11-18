@@ -26,6 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var audioRecorder: AudioRecorder?
     var waveformWindow: WaveformWindow?
     var transcriptionManager: TranscriptionManager?
+    var trainingWindow: TrainingWindow?
     var aboutWindow: AboutWindow?
 
     // Keep strong references to sound objects to prevent deallocation
@@ -50,6 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioRecorder = AudioRecorder()
         transcriptionManager = TranscriptionManager()
         waveformWindow = WaveformWindow()
+        trainingWindow = TrainingWindow()
         aboutWindow = AboutWindow()
 
         // Setup audio recorder callback
@@ -76,6 +78,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Midori - Voice to Text", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+
+        // Add Custom Dictionary menu item
+        menu.addItem(NSMenuItem(title: "Custom Dictionary...", action: #selector(showTraining), keyEquivalent: "d"))
 
         // Add About menu item
         menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
@@ -321,6 +326,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    @objc private func showTraining() {
+        print("📚 Showing Custom Dictionary window")
+        trainingWindow?.show()
     }
 
     @objc private func showAbout() {

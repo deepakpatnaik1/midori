@@ -5,17 +5,14 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Fixed build location for permission persistence
+BUILD_DIR="$(pwd)/build"
+mkdir -p "$BUILD_DIR"
+
 echo "🔨 Building Midori in Debug configuration..."
-xcodebuild -scheme Midori-Debug -configuration Debug build
-
-# Find the DerivedData location
-DERIVED_DATA=$(xcodebuild -scheme Midori-Debug -showBuildSettings 2>/dev/null | grep "^\s*BUILD_DIR" | awk '{print $3}')
-APP_PATH="$DERIVED_DATA/Debug/midori.app"
-
-# Create symlink for stable access
-mkdir -p build
-rm -f build/midori.app
-ln -sf "$APP_PATH" build/midori.app
+xcodebuild -scheme Midori-Debug -configuration Debug \
+    CONFIGURATION_BUILD_DIR="$BUILD_DIR" \
+    build
 
 echo "✅ Build complete!"
-echo "📍 Binary location: build/midori.app -> $APP_PATH"
+echo "📍 Binary location: $BUILD_DIR/midori.app"
