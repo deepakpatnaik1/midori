@@ -62,6 +62,9 @@ struct TrainingView: View {
     @State private var recordingTimer: DispatchWorkItem?
     @State private var statusMessage: String = ""
     @State private var consecutiveExists: Int = 0
+    @State private var showManualEntry: Bool = false
+    @State private var manualIncorrect: String = ""
+    @State private var manualCorrect: String = ""
 
     @Environment(\.dismiss) private var dismiss
 
@@ -148,6 +151,71 @@ struct TrainingView: View {
             .padding(16)
 
             Divider()
+
+            // Manual entry section
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Samples")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Button(action: {
+                        showManualEntry.toggle()
+                        if !showManualEntry {
+                            manualIncorrect = ""
+                            manualCorrect = ""
+                        }
+                    }) {
+                        Image(systemName: showManualEntry ? "minus.circle.fill" : "plus.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+
+                if showManualEntry {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            TextField("Incorrect", text: $manualIncorrect)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 10))
+                                .padding(6)
+                                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                                .cornerRadius(4)
+
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 8))
+                                .foregroundColor(.secondary)
+
+                            TextField("Correct", text: $manualCorrect)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 10))
+                                .padding(6)
+                                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                                .cornerRadius(4)
+
+                            Button(action: addManualEntry) {
+                                Text("Add")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(manualIncorrect.isEmpty || manualCorrect.isEmpty ? Color.blue.opacity(0.5) : Color.blue)
+                                    .cornerRadius(4)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(manualIncorrect.isEmpty || manualCorrect.isEmpty)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                    }
+                }
+            }
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.15))
 
             // Training samples list
             if trainingSamples.isEmpty {
@@ -358,6 +426,17 @@ struct TrainingView: View {
 
     private func deleteSample(at index: Int) {
         dictionaryManager.removeSample(at: index)
+    }
+
+    private func addManualEntry() {
+        guard !manualIncorrect.isEmpty, !manualCorrect.isEmpty else { return }
+
+        dictionaryManager.addSample(incorrect: manualIncorrect, correct: manualCorrect)
+        print("✓ Manual entry added: '\(manualIncorrect)' -> '\(manualCorrect)'")
+
+        // Clear the form
+        manualIncorrect = ""
+        manualCorrect = ""
     }
 
     private func buttonColor() -> Color {
