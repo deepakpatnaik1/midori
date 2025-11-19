@@ -35,6 +35,7 @@ enum TranscriptionError: Error {
 class TranscriptionManager {
     private var asrManager: AsrManager?
     private var isInitialized = false
+    var onInitializationComplete: ((Result<Void, Error>) -> Void)?
 
     init() {
         print("✓ TranscriptionManager initialized")
@@ -58,9 +59,25 @@ class TranscriptionManager {
 
             isInitialized = true
             print("✓ Parakeet V2 model loaded and ready")
+
+            // Notify completion on main thread
+            DispatchQueue.main.async { [weak self] in
+                self?.onInitializationComplete?(.success(()))
+            }
         } catch {
             print("❌ Failed to initialize Parakeet model: \(error.localizedDescription)")
             isInitialized = false
+
+            // Notify failure on main thread
+            DispatchQueue.main.async { [weak self] in
+                self?.onInitializationComplete?(.failure(error))
+            }
+        }
+    }
+
+    func retryInitialization() {
+        Task {
+            await initializeModel()
         }
     }
 

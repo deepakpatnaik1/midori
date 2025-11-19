@@ -28,6 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var transcriptionManager: TranscriptionManager?
     var trainingWindow: TrainingWindow?
     var aboutWindow: AboutWindow?
+    var onboardingWindow: OnboardingWindow?
 
     // Keep strong references to sound objects to prevent deallocation
     var popSound1: NSSound?
@@ -49,7 +50,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Initialize managers
         audioRecorder = AudioRecorder()
-        transcriptionManager = TranscriptionManager()
         waveformWindow = WaveformWindow()
         trainingWindow = TrainingWindow(audioRecorder: audioRecorder, transcriptionManager: transcriptionManager)
         aboutWindow = AboutWindow()
@@ -65,7 +65,71 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleRightCommandKey(isPressed: isPressed)
         }
 
+        // Check if model has been downloaded before
+        let hasDownloadedModel = UserDefaults.standard.bool(forKey: "hasDownloadedModel")
+
+        print("✓ Checking model download status: hasDownloadedModel = \(hasDownloadedModel)")
+
+        if !hasDownloadedModel {
+            // First launch - show onboarding window
+            print("✓ First launch detected - showing onboarding window")
+            showOnboardingAndInitialize()
+        } else {
+            // Model already downloaded - initialize silently
+            print("✓ Model already downloaded - initializing silently")
+            initializeTranscriptionManager()
+        }
+
         print("✓ Midori ready - Press Right Command to start recording")
+    }
+
+    private func showOnboardingAndInitialize() {
+        onboardingWindow = OnboardingWindow()
+        onboardingWindow?.show { [weak self] shouldStartDownload in
+            guard let self = self else { return }
+
+            if shouldStartDownload {
+                // User didn't click retry - this is the initial download
+                self.initializeTranscriptionManager()
+            } else {
+                // User clicked retry
+                self.transcriptionManager?.retryInitialization()
+            }
+        }
+    }
+
+    private func initializeTranscriptionManager() {
+        transcriptionManager = TranscriptionManager()
+
+        // Setup completion callback
+        transcriptionManager?.onInitializationComplete = { [weak self] result in
+            guard let self = self else { return }
+
+            switch result {
+            case .success:
+                print("✓ Model download complete")
+                // Mark as downloaded
+                UserDefaults.standard.set(true, forKey: "hasDownloadedModel")
+
+                // Update onboarding window if showing
+                if let window = self.onboardingWindow {
+                    window.updateStatus(.success)
+                    // Give user a moment to see "Ready!" message
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        window.close()
+                        self.onboardingWindow = nil
+                    }
+                }
+
+            case .failure(let error):
+                print("❌ Model download failed: \(error.localizedDescription)")
+                // Update onboarding window with error
+                self.onboardingWindow?.updateStatus(.failed("Download failed. Please check your internet connection."))
+            }
+        }
+
+        // Update training window with transcription manager
+        trainingWindow = TrainingWindow(audioRecorder: audioRecorder, transcriptionManager: transcriptionManager)
     }
 
     private func setupMenuBar() {
