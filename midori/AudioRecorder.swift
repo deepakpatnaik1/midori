@@ -120,6 +120,53 @@ class AudioRecorder {
         return devices
     }
 
+    // Find built-in microphone device (iMac, MacBook, etc.)
+    private func findBuiltInMicrophone() -> AudioDeviceID? {
+        let devices = getAvailableInputDevices()
+
+        // Look for built-in microphone
+        let builtIn = devices.first { device in
+            let name = device.name.lowercased()
+            return name.contains("built-in") ||
+                   name.contains("imac") ||
+                   name.contains("macbook") ||
+                   name.contains("internal")
+        }
+
+        if let device = builtIn {
+            print("✓ Found built-in microphone: \(device.name) (ID: \(device.id))")
+            return device.id
+        } else {
+            print("⚠️ Could not find built-in microphone")
+            return nil
+        }
+    }
+
+    // Programmatically set the input device for AVAudioEngine
+    private func setInputDevice(deviceID: AudioDeviceID) {
+        var deviceID = deviceID
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            UInt32(MemoryLayout<AudioDeviceID>.size),
+            &deviceID
+        )
+
+        if status == noErr {
+            print("✓ Input device set successfully")
+        } else {
+            print("⚠️ Failed to set input device (status: \(status))")
+        }
+    }
+
     func startRecording() {
         guard !isRecording else { return }
         isRecording = true
@@ -184,6 +231,14 @@ class AudioRecorder {
     private func startRealAudioRecording() {
         // Clear previous recordings
         recordedBuffers.removeAll()
+
+        // Force selection of built-in microphone (ignore AirPods for reliability)
+        if let builtInMic = findBuiltInMicrophone() {
+            print("✓ Forcing built-in microphone for recording (AirPods will be used for output only)")
+            setInputDevice(deviceID: builtInMic)
+        } else {
+            print("⚠️ Could not find built-in microphone, using system default")
+        }
 
         audioEngine = AVAudioEngine()
 
