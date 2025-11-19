@@ -10,9 +10,11 @@ import Foundation
 class CorrectionLayer {
     static let shared = CorrectionLayer()
 
-    private let dictionaryManager = DictionaryManager.shared
+    private let dictionaryManager: DictionaryManager
 
-    private init() {}
+    init(dictionaryManager: DictionaryManager = DictionaryManager.shared) {
+        self.dictionaryManager = dictionaryManager
+    }
 
     /// Applies custom dictionary corrections to transcribed text
     func applyCorrections(to text: String) -> String {
@@ -32,12 +34,13 @@ class CorrectionLayer {
 
             if words.isEmpty { continue }
 
-            // Create pattern: word1\s*\p{P}*\s*word2\s*\p{P}*\s*word3...
-            var pattern = ""
+            // Create pattern with word boundaries: \bword1\b\s*\p{P}*\s*\bword2\b...
+            var pattern = "\\b" // Start with word boundary
             for (index, word) in words.enumerated() {
                 pattern += NSRegularExpression.escapedPattern(for: word)
+                pattern += "\\b" // End word with boundary
                 if index < words.count - 1 {
-                    pattern += "\\s*\\p{P}*\\s*" // optional whitespace, punctuation, whitespace
+                    pattern += "\\s*\\p{P}*\\s*\\b" // optional whitespace, punctuation, whitespace, then next word boundary
                 }
             }
 
@@ -49,7 +52,9 @@ class CorrectionLayer {
                 // Replace matches in reverse order to maintain string indices
                 for match in matches.reversed() {
                     let range = match.range
-                    correctedText = (correctedText as NSString).replacingCharacters(in: range, with: sample.correct) as String
+                    // Strip trailing punctuation from replacement to avoid double punctuation
+                    let replacement = sample.correct.trimmingCharacters(in: CharacterSet(charactersIn: ".!?,;:"))
+                    correctedText = (correctedText as NSString).replacingCharacters(in: range, with: replacement) as String
                 }
             }
         }
