@@ -12,3 +12,8 @@ DerivedData/
 .swiftpm/
 .build/
 FluidAudio-Local/
+
+# Build artifacts
+build-release/
+dmg-staging/
+release/
