@@ -11,11 +11,27 @@
 		BD7D3F1E2ECB548A00BBF418 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = BD7D3F1D2ECB548A00BBF418 /* FluidAudio */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		BD63B3592ECD80A600960519 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BDEED7E92EBC80BA0003B899 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BDEED7F02EBC80BA0003B899;
+			remoteInfo = midori;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		BD63B3552ECD80A600960519 /* MidoriTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MidoriTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BDEED7F12EBC80BA0003B899 /* midori.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = midori.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		BD63B3562ECD80A600960519 /* MidoriTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MidoriTests;
+			sourceTree = "<group>";
+		};
 		BDEED7F32EBC80BA0003B899 /* midori */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = midori;
@@ -24,6 +40,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		BD63B3522ECD80A600960519 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BDEED7EE2EBC80BA0003B899 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -40,6 +63,7 @@
 			isa = PBXGroup;
 			children = (
 				BDEED7F32EBC80BA0003B899 /* midori */,
+				BD63B3562ECD80A600960519 /* MidoriTests */,
 				BDEED7F22EBC80BA0003B899 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -48,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				BDEED7F12EBC80BA0003B899 /* midori.app */,
+				BD63B3552ECD80A600960519 /* MidoriTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,6 +80,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		BD63B3542ECD80A600960519 /* MidoriTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BD63B35B2ECD80A600960519 /* Build configuration list for PBXNativeTarget "MidoriTests" */;
+			buildPhases = (
+				BD63B3512ECD80A600960519 /* Sources */,
+				BD63B3522ECD80A600960519 /* Frameworks */,
+				BD63B3532ECD80A600960519 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BD63B35A2ECD80A600960519 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				BD63B3562ECD80A600960519 /* MidoriTests */,
+			);
+			name = MidoriTests;
+			packageProductDependencies = (
+			);
+			productName = MidoriTests;
+			productReference = BD63B3552ECD80A600960519 /* MidoriTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		BDEED7F02EBC80BA0003B899 /* midori */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BDEED7FC2EBC80BB0003B899 /* Build configuration list for PBXNativeTarget "midori" */;
@@ -89,6 +137,10 @@
 				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 2610;
 				TargetAttributes = {
+					BD63B3542ECD80A600960519 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = BDEED7F02EBC80BA0003B899;
+					};
 					BDEED7F02EBC80BA0003B899 = {
 						CreatedOnToolsVersion = 26.1;
 					};
@@ -113,11 +165,19 @@
 			projectRoot = "";
 			targets = (
 				BDEED7F02EBC80BA0003B899 /* midori */,
+				BD63B3542ECD80A600960519 /* MidoriTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		BD63B3532ECD80A600960519 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BDEED7EF2EBC80BA0003B899 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -128,6 +188,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		BD63B3512ECD80A600960519 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BDEED7ED2EBC80BA0003B899 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -137,7 +204,55 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		BD63B35A2ECD80A600960519 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BDEED7F02EBC80BA0003B899 /* midori */;
+			targetProxy = BD63B3592ECD80A600960519 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		BD63B35C2ECD80A600960519 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NG9X4L83KH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepakpatnaik.MidoriTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/midori.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/midori";
+			};
+			name = Debug;
+		};
+		BD63B35D2ECD80A600960519 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NG9X4L83KH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepakpatnaik.MidoriTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/midori.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/midori";
+			};
+			name = Release;
+		};
 		BDEED7FA2EBC80BB0003B899 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -330,6 +445,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		BD63B35B2ECD80A600960519 /* Build configuration list for PBXNativeTarget "MidoriTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BD63B35C2ECD80A600960519 /* Debug */,
+				BD63B35D2ECD80A600960519 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		BDEED7EC2EBC80BA0003B899 /* Build configuration list for PBXProject "midori" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -14,9 +14,10 @@ class DictionaryManager: ObservableObject {
     @Published var trainingSamples: [(incorrect: String, correct: String)] = []
 
     private let userDefaults = UserDefaults.standard
-    private let storageKey = "midori_training_samples"
+    private let storageKey: String
 
-    private init() {
+    init(storageKey: String = "midori_training_samples") {
+        self.storageKey = storageKey
         loadSamples()
     }
 
