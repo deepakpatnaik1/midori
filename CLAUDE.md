@@ -144,10 +144,17 @@ This is a **deliberate design decision** for reliability. Do not "fix" this to a
 ### Code Signing
 The Xcode project is configured with:
 - Team ID: `NG9X4L83KH`
-- Certificate: Apple Development
+- Certificate: Apple Development (Debug), Developer ID Application (Release)
 - Sandboxing: **Disabled** (required for global key monitoring)
+- **Entitlements**: `midori.entitlements` (REQUIRED for production builds with Hardened Runtime)
 
-This ensures permissions persist across builds. See `Code-Signing-Setup.md` for details.
+**CRITICAL for Production Builds**: When building with Hardened Runtime (`ENABLE_HARDENED_RUNTIME=YES`), you MUST use the `midori.entitlements` file. Without it, macOS will block microphone access and the app will be non-functional (waveform appears but doesn't respond to audio).
+
+Required entitlements:
+- `com.apple.security.device.audio-input` = true (microphone access)
+- `com.apple.security.cs.disable-library-validation` = true (global event monitoring)
+
+See `Code-Signing-Setup.md` for details.
 
 ### Text Injection
 Uses Accessibility API (requires permission):
@@ -227,19 +234,17 @@ Audio recording requires actual hardware. For testing:
 
 ## Known Quirks and Design Decisions
 
-1. **Debug builds only**: Release builds historically had issues with FluidAudio. Continue using Debug configuration.
+1. **Fixed build location**: Build output goes to `build/` directory to prevent permission resets. Do not change.
 
-2. **Fixed build location**: Build output goes to `build/` directory to prevent permission resets. Do not change.
+2. **No sandboxing**: App sandbox is disabled because global key monitoring (NSEvent.addGlobalMonitorForEvents) doesn't work in sandboxed apps.
 
-3. **No sandboxing**: App sandbox is disabled because global key monitoring (NSEvent.addGlobalMonitorForEvents) doesn't work in sandboxed apps.
+3. **Forced built-in mic**: Intentionally ignores AirPods for reliability. This is not a bug.
 
-4. **Forced built-in mic**: Intentionally ignores AirPods for reliability. This is not a bug.
+4. **0.5-second delay**: Recording doesn't start immediately—there's a 0.5s delay to prevent accidental triggers. This is user-requested behavior.
 
-5. **0.5-second delay**: Recording doesn't start immediately—there's a 0.5s delay to prevent accidental triggers. This is user-requested behavior.
+5. **Sentence case formatting**: CorrectionLayer automatically capitalizes the first letter and adds a period. This is intentional.
 
-6. **Sentence case formatting**: CorrectionLayer automatically capitalizes the first letter and adds a period. This is intentional.
-
-7. **UserDefaults for persistence**: Custom dictionary uses UserDefaults with JSON encoding. Simple and effective for this use case.
+6. **UserDefaults for persistence**: Custom dictionary uses UserDefaults with JSON encoding. Simple and effective for this use case.
 
 ---
 
@@ -256,7 +261,6 @@ Audio recording requires actual hardware. For testing:
 - Custom dictionary implementation (Phase 2 complete)
 - Training UI with manual entry option (Phase 4 complete)
 - Comprehensive test suite (TEST-COVERAGE.md)
-- AirPods investigation (AIRPODS_INVESTIGATION.md)
 
 **Branch**: `main` (stable)
 
@@ -295,7 +299,6 @@ All Swift source files: `midori/*.swift`
 - `Implementation-Plan.md`: Phase-by-phase development plan
 - `TEST-COVERAGE.md`: Test suite documentation
 - `Code-Signing-Setup.md`: Permission persistence setup
-- `AIRPODS_INVESTIGATION.md`: AirPods compatibility research
 
 ### Scripts
 - `scripts/build.sh`: Debug build

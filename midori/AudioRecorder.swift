@@ -232,12 +232,9 @@ class AudioRecorder {
         // Clear previous recordings
         recordedBuffers.removeAll()
 
-        // Force selection of built-in microphone (ignore AirPods for reliability)
+        // Force built-in microphone for reliability (ignores AirPods, external mics)
         if let builtInMic = findBuiltInMicrophone() {
-            print("✓ Forcing built-in microphone for recording (AirPods will be used for output only)")
             setInputDevice(deviceID: builtInMic)
-        } else {
-            print("⚠️ Could not find built-in microphone, using system default")
         }
 
         audioEngine = AVAudioEngine()
@@ -254,7 +251,7 @@ class AudioRecorder {
             return
         }
 
-        // Use the format that the current input device provides
+        // Use the format from the input device (should be 48kHz for built-in mic)
         let format = input.outputFormat(forBus: 0)
         print("✓ Recording format: \(format.sampleRate)Hz, \(format.channelCount) channels")
 

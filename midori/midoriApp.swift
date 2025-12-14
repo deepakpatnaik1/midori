@@ -45,6 +45,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hide dock icon (LSUIElement handles this, but ensure no window appears)
         NSApp.setActivationPolicy(.accessory)
 
+        // Prompt for Accessibility permission (required for text injection)
+        // This shows the system dialog and adds app to System Settings automatically
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let accessibilityEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        print("✓ Accessibility permission: \(accessibilityEnabled ? "granted" : "needs approval")")
+
         // Create menu bar status item
         setupMenuBar()
 
@@ -257,7 +263,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Show waveform window
             self.waveformWindow?.show()
 
-            // Start audio recording (device configured per-engine, not system-wide)
+            // Start audio recording
             self.audioRecorder?.startRecording()
         }
     }
@@ -286,13 +292,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Get audio data and transcribe
             if let audioData = self.audioRecorder?.getAudioData() {
-                print("📝 Transcribing audio...")
-                print("🔍 TRANSCRIPTION FLOW HIT - audioData size: \(audioData.count) bytes")
+                print("📝 Transcribing \(audioData.count) bytes of audio...")
                 self.transcriptionManager?.transcribe(audioData: audioData) { [weak self] result in
                     DispatchQueue.main.async {
                         switch result {
                         case .success(let text):
-                            print("✓ Transcription complete: [REDACTED - \(text.count) characters]")
+                            print("✓ Transcription complete: \(text.count) chars, text: \"\(text)\"")
+                            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                print("⚠️ Empty transcription - nothing to inject")
+                                return
+                            }
                             self?.injectText(text)
                         case .failure(let error):
                             print("❌ Transcription failed: \(error.localizedDescription)")

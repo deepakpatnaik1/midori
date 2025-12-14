@@ -119,9 +119,11 @@ class TranscriptionManager {
             let samples = try convertAudioTo16kHzMono(audioData: audioData)
 
             // Transcribe using FluidAudio
+            print("🔍 Sending \(samples.count) samples to Parakeet (\(Double(samples.count) / 16000.0) seconds of audio)")
             let result = try await manager.transcribe(samples)
 
-            print("✓ Parakeet transcription complete: [REDACTED - \(result.text.count) characters]")
+            print("✓ Parakeet transcription complete: \(result.text.count) chars")
+            print("🔍 Raw Parakeet output: \"\(result.text)\"")
 
             // Apply custom dictionary corrections
             let correctedText = CorrectionLayer.shared.applyCorrections(to: result.text)
@@ -139,21 +141,18 @@ class TranscriptionManager {
     }
 
     // Convert audio data to 16kHz mono format required by FluidAudio
+    // Built-in Mac microphone captures at 48kHz, so we downsample 3:1
     private func convertAudioTo16kHzMono(audioData: Data) throws -> [Float] {
-        print("🔄 Converting audio to 16kHz mono...")
-
         // Extract Float32 samples from raw audio data
-        // AVAudioEngine typically captures at 48kHz Float32 mono
         let floatSamples = audioData.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> [Float] in
             let buffer = ptr.bindMemory(to: Float.self)
             return Array(buffer)
         }
 
-        print("✓ Extracted \(floatSamples.count) Float32 samples")
+        print("✓ Extracted \(floatSamples.count) Float32 samples at 48kHz")
 
-        // Downsample from 48kHz to 16kHz (3:1 ratio)
-        // AVAudioEngine typically uses 48kHz on macOS
-        let downsampleRatio = 3 // 48000 / 16000 = 3
+        // Downsample 48kHz → 16kHz (3:1 ratio)
+        let downsampleRatio = 3
         var resampled: [Float] = []
         resampled.reserveCapacity(floatSamples.count / downsampleRatio)
 
@@ -161,7 +160,7 @@ class TranscriptionManager {
             resampled.append(floatSamples[i])
         }
 
-        print("✓ Downsampled to 16kHz: \(resampled.count) samples")
+        print("✓ Resampled to 16kHz: \(resampled.count) samples (\(Double(resampled.count) / 16000.0) seconds)")
         return resampled
     }
 }
