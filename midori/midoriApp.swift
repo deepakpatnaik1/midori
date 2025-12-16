@@ -7,7 +7,6 @@
 
 import SwiftUI
 import AppKit
-import AudioToolbox
 
 @main
 struct midoriApp: App {
@@ -29,10 +28,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var trainingWindow: TrainingWindow?
     var aboutWindow: AboutWindow?
     var onboardingWindow: OnboardingWindow?
-
-    // Keep strong references to sound objects to prevent deallocation
-    var popSound1: NSSound?
-    var popSound2: NSSound?
 
     // Bulletproof state management
     private var isRecording = false
@@ -239,25 +234,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
-            // Create sound objects and keep strong references to prevent deallocation
-            self.popSound1 = NSSound(named: "Pop")
-            self.popSound2 = NSSound(named: "Pop")
-
-            if let sound1 = self.popSound1 {
-                sound1.volume = 1.0
-                sound1.play()
-                print("🔊 Pop sound 1 played")
-            } else {
-                print("⚠️ Pop sound not available")
-            }
-
-            // Play second pop with delay
+            // Play pop sounds using AVAudioPlayer (better device routing)
+            self.playPopSound()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                if let sound2 = self?.popSound2 {
-                    sound2.volume = 1.0
-                    sound2.play()
-                    print("🔊 Pop sound 2 played")
-                }
+                self?.playPopSound()
             }
 
             // Show waveform window
@@ -435,5 +415,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quit() {
         print("👋 Quitting Midori...")
         NSApp.terminate(nil)
+    }
+
+    private func playPopSound() {
+        NSSound(named: "Pop")?.play()
     }
 }

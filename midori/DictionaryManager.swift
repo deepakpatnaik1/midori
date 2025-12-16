@@ -13,6 +13,9 @@ class DictionaryManager: ObservableObject {
 
     @Published var trainingSamples: [(incorrect: String, correct: String)] = []
 
+    // Alias for Transcriber compatibility
+    var entries: [(incorrect: String, correct: String)] { trainingSamples }
+
     private let userDefaults = UserDefaults.standard
     private let storageKey: String
 

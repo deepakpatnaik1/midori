@@ -2,8 +2,7 @@
 //  AudioRecorder.swift
 //  midori
 //
-//  Captures audio into AVAudioPCMBuffer for transcription
-//  Forces built-in microphone (completely ignores AirPods)
+//  Captures audio from built-in microphone only
 //
 
 import AVFoundation
@@ -13,63 +12,38 @@ class AudioRecorder {
     private var engine: AVAudioEngine?
     private var buffers: [AVAudioPCMBuffer] = []
     private let maxBuffers = 300  // ~10 seconds
-    private var deviceChangeListenerBlock: AudioObjectPropertyListenerBlock?
-    private var isRecording = false
     private var builtInMicID: AudioDeviceID?
 
     // Gain multiplier for soft speech (2.5x boost)
     private let audioGain: Float = 2.5
 
-    var onAudioLevel: ((Float) -> Void)?
+    var onAudioLevelUpdate: ((Float) -> Void)?
 
     init() {
-        // Cache the built-in mic ID at startup
         builtInMicID = findBuiltInMicrophoneID()
-
-        // Force built-in mic immediately
-        selectBuiltInMicrophone()
-
-        // Monitor for device changes (e.g., AirPods connecting)
-        setupDeviceChangeListener()
+        forceBuiltInMicrophone()
     }
 
-    deinit {
-        removeDeviceChangeListener()
-    }
-
-    func start() {
+    func startRecording() {
         buffers.removeAll()
-        isRecording = true
 
-        // Force built-in microphone as system default
-        selectBuiltInMicrophone()
+        // Always force built-in mic before recording
+        forceBuiltInMicrophone()
 
         engine = AVAudioEngine()
         guard let engine = engine else { return }
 
-        // CRITICAL: Set input device directly on the audio unit
-        // This bypasses system default and forces built-in mic
-        if let builtInID = builtInMicID {
-            setInputDeviceOnEngine(engine, deviceID: builtInID)
-        }
-
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
 
-        // Validate format - AirPods can cause invalid formats
         guard format.sampleRate > 0, format.channelCount > 0 else {
-            print("Invalid audio format - trying to recover")
-            self.engine = nil
-            // Wait and retry with fresh engine
-            Thread.sleep(forTimeInterval: 0.1)
-            start()
+            print("Invalid audio format")
             return
         }
 
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
             guard let self = self else { return }
 
-            // Store buffer copy
             if self.buffers.count < self.maxBuffers,
                let copy = buffer.copy() as? AVAudioPCMBuffer {
                 self.buffers.append(copy)
@@ -88,7 +62,7 @@ class AudioRecorder {
                 let level = min(rms * 10, 1.0)
 
                 DispatchQueue.main.async {
-                    self.onAudioLevel?(level)
+                    self.onAudioLevelUpdate?(level)
                 }
             }
         }
@@ -100,174 +74,67 @@ class AudioRecorder {
         }
     }
 
-    func stop() -> AVAudioPCMBuffer? {
-        isRecording = false
-        guard let engine = engine else { return nil }
+    func stopRecording() {
+        guard let engine = engine else { return }
 
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         self.engine = nil
 
-        onAudioLevel?(0)
-
-        return combineBuffers()
+        onAudioLevelUpdate?(0)
     }
 
-    // MARK: - Device Change Monitoring
+    func getAudioData() -> Data? {
+        guard let buffer = combineBuffers() else { return nil }
 
-    private func setupDeviceChangeListener() {
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        deviceChangeListenerBlock = { [weak self] (_, _) in
-            guard let self = self else { return }
-
-            // Check if the new default device is NOT the built-in mic
-            let currentDefault = self.getCurrentDefaultInputDevice()
-            if let builtIn = self.builtInMicID, currentDefault != builtIn {
-                print("Device changed to non-built-in mic (possibly AirPods) - forcing back to built-in")
-                self.selectBuiltInMicrophone()
-            }
-        }
-
-        if let block = deviceChangeListenerBlock {
-            AudioObjectAddPropertyListenerBlock(
-                AudioObjectID(kAudioObjectSystemObject),
-                &propertyAddress,
-                DispatchQueue.main,
-                block
-            )
-        }
+        let audioBuffer = buffer.audioBufferList.pointee.mBuffers
+        guard let mData = audioBuffer.mData else { return nil }
+        return Data(bytes: mData, count: Int(audioBuffer.mDataByteSize))
     }
 
-    private func removeDeviceChangeListener() {
-        guard let block = deviceChangeListenerBlock else { return }
+    // MARK: - Built-in Microphone
 
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        AudioObjectRemovePropertyListenerBlock(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            DispatchQueue.main,
-            block
-        )
-        deviceChangeListenerBlock = nil
-    }
-
-    private func getCurrentDefaultInputDevice() -> AudioDeviceID {
-        var deviceID: AudioDeviceID = 0
-        var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize,
-            &deviceID
-        )
-
-        return deviceID
-    }
-
-    // MARK: - Force Built-in Microphone
-
-    private func setInputDeviceOnEngine(_ engine: AVAudioEngine, deviceID: AudioDeviceID) {
-        // Get the audio unit from the input node
-        let inputNode = engine.inputNode
-        let audioUnit = inputNode.audioUnit
-
-        guard let au = audioUnit else {
-            print("Could not get audio unit from input node")
+    private func forceBuiltInMicrophone() {
+        guard let deviceID = builtInMicID else {
+            print("Built-in microphone not found")
             return
         }
 
-        // Set the input device directly on the audio unit
-        var deviceID = deviceID
-        let status = AudioUnitSetProperty(
-            au,
-            kAudioOutputUnitProperty_CurrentDevice,
-            kAudioUnitScope_Global,
-            0,
-            &deviceID,
-            UInt32(MemoryLayout<AudioDeviceID>.size)
-        )
-
-        if status == noErr {
-            print("Set input device directly on audio unit: \(deviceID)")
-        } else {
-            print("Failed to set input device on audio unit: \(status)")
-        }
-    }
-
-    private func selectBuiltInMicrophone() {
-        guard let builtInID = findBuiltInMicrophoneID() else {
-            print("Could not find built-in microphone")
-            return
-        }
-
-        var deviceID = builtInID
-        var propertyAddress = AudioObjectPropertyAddress(
+        var id = deviceID
+        var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultInputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
 
-        let status = AudioObjectSetPropertyData(
+        AudioObjectSetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
+            &address,
             0,
             nil,
             UInt32(MemoryLayout<AudioDeviceID>.size),
-            &deviceID
+            &id
         )
-
-        if status == noErr {
-            print("Switched to built-in microphone")
-        }
     }
 
     private func findBuiltInMicrophoneID() -> AudioDeviceID? {
-        var propertyAddress = AudioObjectPropertyAddress(
+        var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
 
         var dataSize: UInt32 = 0
-        var status = AudioObjectGetPropertyDataSize(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize
-        )
-        guard status == noErr else { return nil }
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize) == noErr else {
+            return nil
+        }
 
         let deviceCount = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
         var devices = [AudioDeviceID](repeating: 0, count: deviceCount)
 
-        status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize,
-            &devices
-        )
-        guard status == noErr else { return nil }
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize, &devices) == noErr else {
+            return nil
+        }
 
         for deviceID in devices {
             if isBuiltInMicrophone(deviceID) {
@@ -279,7 +146,7 @@ class AudioRecorder {
     }
 
     private func isBuiltInMicrophone(_ deviceID: AudioDeviceID) -> Bool {
-        // Check if device has input channels
+        // Check for input channels
         var inputAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
             mScope: kAudioDevicePropertyScopeInput,
@@ -287,19 +154,20 @@ class AudioRecorder {
         )
 
         var dataSize: UInt32 = 0
-        var status = AudioObjectGetPropertyDataSize(deviceID, &inputAddress, 0, nil, &dataSize)
-        guard status == noErr, dataSize > 0 else { return false }
+        guard AudioObjectGetPropertyDataSize(deviceID, &inputAddress, 0, nil, &dataSize) == noErr,
+              dataSize > 0 else {
+            return false
+        }
 
-        let bufferListPointer = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
-        defer { bufferListPointer.deallocate() }
+        let bufferList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
+        defer { bufferList.deallocate() }
 
-        status = AudioObjectGetPropertyData(deviceID, &inputAddress, 0, nil, &dataSize, bufferListPointer)
-        guard status == noErr else { return false }
+        guard AudioObjectGetPropertyData(deviceID, &inputAddress, 0, nil, &dataSize, bufferList) == noErr,
+              bufferList.pointee.mBuffers.mNumberChannels > 0 else {
+            return false
+        }
 
-        let channelCount = bufferListPointer.pointee.mBuffers.mNumberChannels
-        guard channelCount > 0 else { return false }
-
-        // Check transport type - built-in devices have kAudioDeviceTransportTypeBuiltIn
+        // Check transport type
         var transportType: UInt32 = 0
         var transportSize = UInt32(MemoryLayout<UInt32>.size)
         var transportAddress = AudioObjectPropertyAddress(
@@ -308,17 +176,17 @@ class AudioRecorder {
             mElement: kAudioObjectPropertyElementMain
         )
 
-        status = AudioObjectGetPropertyData(deviceID, &transportAddress, 0, nil, &transportSize, &transportType)
-        guard status == noErr else { return false }
+        guard AudioObjectGetPropertyData(deviceID, &transportAddress, 0, nil, &transportSize, &transportType) == noErr else {
+            return false
+        }
 
         return transportType == kAudioDeviceTransportTypeBuiltIn
     }
 
-    // MARK: - Combine Buffers
+    // MARK: - Buffer Processing
 
     private func combineBuffers() -> AVAudioPCMBuffer? {
-        guard !buffers.isEmpty,
-              let format = buffers.first?.format else { return nil }
+        guard !buffers.isEmpty, let format = buffers.first?.format else { return nil }
 
         let totalFrames = buffers.reduce(0) { $0 + $1.frameLength }
         guard totalFrames > 0,
@@ -333,10 +201,9 @@ class AudioRecorder {
                   let dst = combined.floatChannelData else { continue }
 
             for channel in 0..<Int(format.channelCount) {
-                // Apply gain and copy with soft clipping
                 for i in 0..<Int(frames) {
                     var sample = src[channel][i] * audioGain
-                    // Soft clip to prevent harsh distortion
+                    // Soft clip
                     if sample > 1.0 {
                         sample = 1.0 - (1.0 / (sample + 1.0))
                     } else if sample < -1.0 {
