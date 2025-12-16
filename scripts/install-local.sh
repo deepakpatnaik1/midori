@@ -22,7 +22,7 @@ cp -R "$BUILT_APP" "$INSTALL_DIR/midori.app"
 
 # Also create symlink in build/ for convenience
 mkdir -p build
-rm -f build/midori.app
+rm -rf build/midori.app
 ln -sf "$INSTALL_DIR/midori.app" build/midori.app
 
 echo "✅ Installed!"
