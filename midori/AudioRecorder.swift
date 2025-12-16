@@ -34,14 +34,10 @@ class AudioRecorder {
         guard let engine = engine else { return }
 
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
 
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            print("Invalid audio format")
-            return
-        }
-
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
+        // Use nil format to let AVAudioEngine use the hardware's native format
+        // This prevents "Input HW format and tap format not matching" crashes
+        input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
             guard let self = self else { return }
 
             if self.buffers.count < self.maxBuffers,
