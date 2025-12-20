@@ -61,7 +61,6 @@ struct TrainingView: View {
     @State private var trainingProgress: String = ""
     @State private var recordingTimer: DispatchWorkItem?
     @State private var statusMessage: String = ""
-    @State private var consecutiveExists: Int = 0
     @State private var showManualEntry: Bool = false
     @State private var manualIncorrect: String = ""
     @State private var manualCorrect: String = ""
@@ -341,51 +340,50 @@ struct TrainingView: View {
 
             transcription.transcribe(audioData: audioData) { [self] result in
                 DispatchQueue.main.async {
-                    isTraining = false
-                    trainingProgress = ""
                     recordingTimer = nil
 
                     switch result {
                     case .success(let text):
-                        // Add training sample
                         let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !cleanedText.isEmpty {
-                            // Normalize: lowercase and remove punctuation
-                            let normalizedText = cleanedText.lowercased()
-                                .components(separatedBy: CharacterSet.punctuationCharacters)
-                                .joined()
-                                .trimmingCharacters(in: .whitespaces)
+                        let normalizedText = cleanedText.lowercased()
+                            .components(separatedBy: CharacterSet.punctuationCharacters)
+                            .joined()
+                            .trimmingCharacters(in: .whitespaces)
 
-                            // Check if this variant already exists (entries are already normalized)
+                        // Check if user said "done" to stop training
+                        if normalizedText == "done" {
+                            print("✓ Training concluded: user said 'done'")
+                            isTraining = false
+                            trainingProgress = ""
+                            targetPhrase = ""
+                            statusMessage = "Training complete - ready for next phrase"
+                            return
+                        }
+
+                        if !cleanedText.isEmpty {
+                            // Check if this variant already exists
                             let exists = trainingSamples.contains {
                                 return $0.incorrect == normalizedText
                             }
 
                             if exists {
-                                consecutiveExists += 1
                                 statusMessage = "Exists"
                                 print("⚠️ Training sample already exists: '\(cleanedText)'")
-
-                                // Auto-conclude after 3 consecutive "Exists"
-                                if consecutiveExists >= 3 {
-                                    print("✓ Training auto-concluded: 3 consecutive duplicates detected")
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                        // Reset for next word/phrase instead of closing
-                                        targetPhrase = ""
-                                        statusMessage = "Training concluded - ready for next phrase"
-                                        consecutiveExists = 0
-                                        // TODO: Save current samples to persistent storage
-                                    }
-                                }
                             } else {
-                                consecutiveExists = 0
                                 statusMessage = "New variant added"
                                 dictionaryManager.addSample(incorrect: cleanedText, correct: targetPhrase)
                                 print("✓ Training sample added: '\(cleanedText)' -> '\(targetPhrase)'")
                             }
                         }
 
+                        // Always continue recording
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.continueTraining()
+                        }
+
                     case .failure(let error):
+                        isTraining = false
+                        trainingProgress = ""
                         statusMessage = "Transcription failed"
                         print("❌ Training transcription failed: \(error.localizedDescription)")
                     }
@@ -410,6 +408,84 @@ struct TrainingView: View {
         trainingProgress = ""
 
         print("⚠️ Training cancelled by user")
+    }
+
+    private func continueTraining() {
+        // Continue training loop - only if still in training mode
+        guard isTraining, !targetPhrase.isEmpty, let recorder = audioRecorder else {
+            isTraining = false
+            trainingProgress = ""
+            return
+        }
+
+        trainingProgress = "Recording..."
+        recorder.startRecording()
+
+        let timer = DispatchWorkItem { [self] in
+            trainingProgress = "Processing..."
+            recorder.stopRecording()
+
+            guard let audioData = recorder.getAudioData() else {
+                print("⚠️ No audio data captured in training")
+                isTraining = false
+                trainingProgress = ""
+                return
+            }
+
+            transcriptionManager?.transcribe(audioData: audioData) { [self] result in
+                DispatchQueue.main.async {
+                    recordingTimer = nil
+
+                    switch result {
+                    case .success(let text):
+                        let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let normalizedText = cleanedText.lowercased()
+                            .components(separatedBy: CharacterSet.punctuationCharacters)
+                            .joined()
+                            .trimmingCharacters(in: .whitespaces)
+
+                        // Check if user said "done" to stop training
+                        if normalizedText == "done" {
+                            print("✓ Training concluded: user said 'done'")
+                            isTraining = false
+                            trainingProgress = ""
+                            targetPhrase = ""
+                            statusMessage = "Training complete - ready for next phrase"
+                            return
+                        }
+
+                        if !cleanedText.isEmpty {
+                            let exists = trainingSamples.contains {
+                                return $0.incorrect == normalizedText
+                            }
+
+                            if exists {
+                                statusMessage = "Exists"
+                                print("⚠️ Training sample already exists: '\(cleanedText)'")
+                            } else {
+                                statusMessage = "New variant added"
+                                dictionaryManager.addSample(incorrect: cleanedText, correct: targetPhrase)
+                                print("✓ Training sample added: '\(cleanedText)' -> '\(targetPhrase)'")
+                            }
+                        }
+
+                        // Always continue recording
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.continueTraining()
+                        }
+
+                    case .failure(let error):
+                        isTraining = false
+                        trainingProgress = ""
+                        statusMessage = "Transcription failed"
+                        print("❌ Training transcription failed: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        recordingTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: timer)
     }
 
     private func handleCancel() {
