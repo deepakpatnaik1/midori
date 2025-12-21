@@ -32,6 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Bulletproof state management
     private var isRecording = false
     private var recordingStartTimer: DispatchWorkItem?
+    private var engineStartTimer: DispatchWorkItem?  // Delays engine start until after pop sounds
     private let stateQueue = DispatchQueue(label: "com.midori.stateQueue")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -234,7 +235,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
-            // Play pop sounds using AVAudioPlayer (better device routing)
+            // Play pop sounds
             self.playPopSound()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
                 self?.playPopSound()
@@ -243,8 +244,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Show waveform window
             self.waveformWindow?.show()
 
-            // Start audio recording
-            self.audioRecorder?.startRecording()
+            // Delay audio recording start until after pops complete (0.3s)
+            // This prevents AVAudioEngine from interfering with sound playback
+            let engineStartWork = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                // Only start if still in recording state (user didn't release key early)
+                self.stateQueue.async {
+                    guard self.isRecording else {
+                        print("⚠️ Recording cancelled before engine started")
+                        return
+                    }
+                    DispatchQueue.main.async {
+                        self.audioRecorder?.startRecording()
+                        print("✅ Audio engine started (after pop sounds)")
+                    }
+                }
+            }
+            self.engineStartTimer = engineStartWork
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.30, execute: engineStartWork)
         }
     }
 
@@ -257,6 +274,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         isRecording = false
         recordingStartTimer = nil  // Ensure timer is cleared
+
+        // Cancel pending engine start (if user released key during pop sounds)
+        engineStartTimer?.cancel()
+        engineStartTimer = nil
 
         print("✅ Recording stopped")
 
