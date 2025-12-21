@@ -125,11 +125,11 @@ class TranscriptionManager {
             print("✓ Parakeet transcription complete: \(result.text.count) chars")
             print("🔍 Raw Parakeet output: \"\(result.text)\"")
 
-            // Apply custom dictionary corrections
+            // Apply corrections
             let correctedText = CorrectionLayer.shared.applyCorrections(to: result.text)
-            print("✓ Applied custom dictionary corrections")
+            print("✓ Applied corrections")
 
-            // Convert number words to digits
+            // Convert number words to digits (with "one" context protection)
             let withNumbers = self.convertNumberWords(in: correctedText)
             print("✓ Converted number words to digits")
 
@@ -184,6 +184,27 @@ class TranscriptionManager {
         "hundred": 100, "thousand": 1000, "million": 1_000_000, "billion": 1_000_000_000
     ]
 
+    // Words before "one" that indicate it should stay as word
+    private static let oneBeforeContext = ["that", "this", "which", "the", "another", "each", "every", "any", "some", "no", "change", "pick", "choose", "select", "find", "get", "want", "need", "have", "see", "only"]
+
+    // Words after "one" that indicate it should stay as word
+    private static let oneAfterContext = ["of", "more", "less", "thing", "time", "way", "reason", "person", "day", "who", "that", "which"]
+
+    private func shouldKeepOneAsWord(words: [String], at index: Int) -> Bool {
+        let beforeWord = index > 0 ? words[index - 1].lowercased().trimmingCharacters(in: .punctuationCharacters) : ""
+        let afterWord = index < words.count - 1 ? words[index + 1].lowercased().trimmingCharacters(in: .punctuationCharacters) : ""
+
+        // Check if preceding or following word indicates "one" should stay as word
+        if Self.oneBeforeContext.contains(beforeWord) {
+            return true
+        }
+        if Self.oneAfterContext.contains(afterWord) {
+            return true
+        }
+
+        return false
+    }
+
     private func convertNumberWords(in text: String) -> String {
         // Expand hyphenated numbers: "seventy-five" → "seventy five"
         var expandedText = text
@@ -203,6 +224,16 @@ class TranscriptionManager {
         var i = 0
 
         while i < words.count {
+            let word = words[i]
+            let cleanWord = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+
+            // Special handling for "one" - check context before converting
+            if cleanWord == "one" && shouldKeepOneAsWord(words: words, at: i) {
+                result.append(word)  // Keep as "one"
+                i += 1
+                continue
+            }
+
             let (numberStr, consumed) = parseNumberSequence(from: words, startingAt: i)
 
             if let num = numberStr, consumed > 0 {
