@@ -165,6 +165,15 @@ class TranscriptionManager {
         }
 
         print("✓ Resampled to 16kHz: \(resampled.count) samples (\(Double(resampled.count) / 16000.0) seconds)")
+
+        // FluidAudio/Parakeet requires minimum 1 second of audio (16000 samples at 16kHz)
+        let minSamples = 16000
+        if resampled.count < minSamples {
+            let padding = minSamples - resampled.count
+            resampled.append(contentsOf: [Float](repeating: 0.0, count: padding))
+            print("✓ Padded with \(padding) silent samples to meet 1 second minimum")
+        }
+
         return resampled
     }
 
