@@ -3,6 +3,7 @@
 //  midori
 //
 //  Captures audio from built-in microphone only
+//  Handles audio route changes gracefully (e.g., AirPods connecting)
 //
 
 import AVFoundation
@@ -13,64 +14,131 @@ class AudioRecorder {
     private var buffers: [AVAudioPCMBuffer] = []
     private let maxBuffers = 300  // ~10 seconds
     private var builtInMicID: AudioDeviceID?
+    private var isCurrentlyRecording = false
+    private let recordingLock = NSLock()
 
     // Gain multiplier for soft speech (2.5x boost)
     private let audioGain: Float = 2.5
 
     var onAudioLevelUpdate: ((Float) -> Void)?
+    var onDeviceError: ((String) -> Void)?
 
     init() {
         builtInMicID = findBuiltInMicrophoneID()
         forceBuiltInMicrophone()
+        setupAudioNotifications()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    // MARK: - Audio Route Change Handling
+
+    private func setupAudioNotifications() {
+        // Listen for audio hardware configuration changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioConfigurationChange),
+            name: NSNotification.Name.AVAudioEngineConfigurationChange,
+            object: nil
+        )
+    }
+
+    @objc private func handleAudioConfigurationChange(_ notification: Notification) {
+        print("⚠️ Audio configuration changed (device connected/disconnected)")
+
+        recordingLock.lock()
+        let wasRecording = isCurrentlyRecording
+        recordingLock.unlock()
+
+        // Always force built-in mic when configuration changes
+        builtInMicID = findBuiltInMicrophoneID()
+        forceBuiltInMicrophone()
+
+        if wasRecording {
+            print("🔄 Restarting recording with built-in microphone...")
+            restartRecordingEngine()
+        }
+    }
+
+    private func restartRecordingEngine() {
+        guard let engine = engine else { return }
+
+        // Stop current engine safely
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+
+        // Small delay to let audio system settle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.reinstallTapAndStart()
+        }
+    }
+
+    private func reinstallTapAndStart() {
+        guard let engine = engine else { return }
+
+        // Force built-in mic again before reinstalling tap
+        forceBuiltInMicrophone()
+
+        let input = engine.inputNode
+
+        // Install fresh tap with nil format (auto-detect hardware format)
+        input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
+            self?.handleAudioBuffer(buffer)
+        }
+
+        do {
+            try engine.start()
+            print("✓ Audio engine restarted successfully with built-in mic")
+        } catch {
+            print("❌ Failed to restart audio engine: \(error)")
+            DispatchQueue.main.async { [weak self] in
+                self?.onDeviceError?("Microphone unavailable. Please check your audio settings.")
+            }
+        }
     }
 
     func startRecording() {
         buffers.removeAll()
 
         // Always force built-in mic before recording
+        builtInMicID = findBuiltInMicrophoneID()
         forceBuiltInMicrophone()
 
         engine = AVAudioEngine()
-        guard let engine = engine else { return }
+        guard let engine = engine else {
+            print("❌ Failed to create AVAudioEngine")
+            return
+        }
 
         let input = engine.inputNode
 
         // Use nil format to let AVAudioEngine use the hardware's native format
         // This prevents "Input HW format and tap format not matching" crashes
         input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
-            guard let self = self else { return }
-
-            if self.buffers.count < self.maxBuffers,
-               let copy = buffer.copy() as? AVAudioPCMBuffer {
-                self.buffers.append(copy)
-            }
-
-            // Calculate RMS for waveform
-            if let data = buffer.floatChannelData {
-                let count = Int(buffer.frameLength)
-                guard count > 0 else { return }
-                var sum: Float = 0
-                for i in 0..<count {
-                    let sample = data[0][i]
-                    sum += sample * sample
-                }
-                let rms = sqrt(sum / Float(count))
-                let level = min(rms * 10, 1.0)
-
-                DispatchQueue.main.async {
-                    self.onAudioLevelUpdate?(level)
-                }
-            }
+            self?.handleAudioBuffer(buffer)
         }
 
         do {
             try engine.start()
+            recordingLock.lock()
+            isCurrentlyRecording = true
+            recordingLock.unlock()
+            print("✓ Recording started with built-in microphone")
         } catch {
-            print("Failed to start audio engine: \(error)")
+            print("❌ Failed to start audio engine: \(error)")
+            DispatchQueue.main.async { [weak self] in
+                self?.onDeviceError?("Could not start recording. Please try again.")
+            }
         }
     }
 
     func stopRecording() {
+        recordingLock.lock()
+        isCurrentlyRecording = false
+        recordingLock.unlock()
+
         guard let engine = engine else { return }
 
         engine.inputNode.removeTap(onBus: 0)
@@ -78,6 +146,34 @@ class AudioRecorder {
         self.engine = nil
 
         onAudioLevelUpdate?(0)
+        print("✓ Recording stopped")
+    }
+
+    // MARK: - Buffer Handling
+
+    private func handleAudioBuffer(_ buffer: AVAudioPCMBuffer) {
+        // Store buffer copy
+        if buffers.count < maxBuffers,
+           let copy = buffer.copy() as? AVAudioPCMBuffer {
+            buffers.append(copy)
+        }
+
+        // Calculate RMS for waveform
+        guard let data = buffer.floatChannelData else { return }
+        let count = Int(buffer.frameLength)
+        guard count > 0 else { return }
+
+        var sum: Float = 0
+        for i in 0..<count {
+            let sample = data[0][i]
+            sum += sample * sample
+        }
+        let rms = sqrt(sum / Float(count))
+        let level = min(rms * 10, 1.0)
+
+        DispatchQueue.main.async { [weak self] in
+            self?.onAudioLevelUpdate?(level)
+        }
     }
 
     func getAudioData() -> Data? {
