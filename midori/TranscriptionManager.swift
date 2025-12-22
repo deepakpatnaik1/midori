@@ -129,7 +129,7 @@ class TranscriptionManager {
             let correctedText = CorrectionLayer.shared.applyCorrections(to: result.text)
             print("✓ Applied corrections")
 
-            // Convert number words to digits (with "one" context protection)
+            // Convert number words to digits (with context protection)
             let withNumbers = self.convertNumberWords(in: correctedText)
             print("✓ Converted number words to digits")
 
@@ -193,21 +193,52 @@ class TranscriptionManager {
         "hundred": 100, "thousand": 1000, "million": 1_000_000, "billion": 1_000_000_000
     ]
 
-    // Words before "one" that indicate it should stay as word
-    private static let oneBeforeContext = ["that", "this", "which", "the", "another", "each", "every", "any", "some", "no", "change", "pick", "choose", "select", "find", "get", "want", "need", "have", "see", "only"]
+    // Words BEFORE a number word that indicate it should stay as word (not digit)
+    // e.g., "the one that", "pick one", "another one", "one of the best"
+    private static let keepAsWordBeforeContext: Set<String> = [
+        // Determiners/articles
+        "the", "a", "an", "this", "that", "these", "those", "another", "other",
+        // Quantifiers
+        "each", "every", "any", "some", "no", "either", "neither",
+        // Selection verbs
+        "pick", "choose", "select", "find", "get", "want", "need", "have", "see", "grab", "take",
+        // Comparisons
+        "only", "just", "even", "also",
+        // Ordinal context
+        "number", "option", "choice", "item", "step", "phase", "part", "chapter", "section"
+    ]
 
-    // Words after "one" that indicate it should stay as word
-    private static let oneAfterContext = ["of", "more", "less", "thing", "time", "way", "reason", "person", "day", "who", "that", "which"]
+    // Words AFTER a number word that indicate it should stay as word
+    // e.g., "one of", "one more", "one thing", "one day"
+    private static let keepAsWordAfterContext: Set<String> = [
+        // Partitive
+        "of", "out",
+        // Comparative
+        "more", "less", "another", "other", "else",
+        // Generic nouns (when "one" means "a single instance")
+        "thing", "time", "way", "reason", "person", "day", "week", "month", "year",
+        "moment", "second", "minute", "hour", "place", "side", "hand", "step",
+        // Relative pronouns (one who, one that)
+        "who", "that", "which", "where", "when"
+    ]
 
-    private func shouldKeepOneAsWord(words: [String], at index: Int) -> Bool {
+    // Check if a number word at given index should stay as word based on context
+    private func shouldKeepAsWord(_ word: String, words: [String], at index: Int) -> Bool {
+        let cleanWord = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+
+        // Only apply context protection to small numbers (0-10) which are commonly used as words
+        guard let value = Self.numberWords[cleanWord], value <= 10 else {
+            return false
+        }
+
         let beforeWord = index > 0 ? words[index - 1].lowercased().trimmingCharacters(in: .punctuationCharacters) : ""
         let afterWord = index < words.count - 1 ? words[index + 1].lowercased().trimmingCharacters(in: .punctuationCharacters) : ""
 
-        // Check if preceding or following word indicates "one" should stay as word
-        if Self.oneBeforeContext.contains(beforeWord) {
+        // Check context
+        if Self.keepAsWordBeforeContext.contains(beforeWord) {
             return true
         }
-        if Self.oneAfterContext.contains(afterWord) {
+        if Self.keepAsWordAfterContext.contains(afterWord) {
             return true
         }
 
@@ -236,13 +267,14 @@ class TranscriptionManager {
             let word = words[i]
             let cleanWord = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
 
-            // Special handling for "one" - check context before converting
-            if cleanWord == "one" && shouldKeepOneAsWord(words: words, at: i) {
-                result.append(word)  // Keep as "one"
+            // Check if this number word should stay as word based on context
+            if Self.numberWords[cleanWord] != nil && shouldKeepAsWord(word, words: words, at: i) {
+                result.append(word)
                 i += 1
                 continue
             }
 
+            // Try to parse a number sequence
             let (numberStr, consumed) = parseNumberSequence(from: words, startingAt: i)
 
             if let num = numberStr, consumed > 0 {
