@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Required for microphone access with Hardened Runtime -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+
+	<!-- Required for global event monitoring (Right Command key) -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+
+	<!-- Allow DYLD environment variables (needed for some debugging) -->
+	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
+	<true/>
+
+	<!-- Disable app sandbox (required for global key monitoring) -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+</dict>
+</plist>
