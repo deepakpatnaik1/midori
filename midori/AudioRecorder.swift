@@ -179,9 +179,15 @@ class AudioRecorder {
     func getAudioData() -> Data? {
         guard let buffer = combineBuffers() else { return nil }
 
-        let audioBuffer = buffer.audioBufferList.pointee.mBuffers
-        guard let mData = audioBuffer.mData else { return nil }
-        return Data(bytes: mData, count: Int(audioBuffer.mDataByteSize))
+        // For float PCM buffers, use floatChannelData (not audioBufferList.mData)
+        guard let floatData = buffer.floatChannelData else { return nil }
+
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0 else { return nil }
+
+        // Convert float samples to Data (channel 0 = mono)
+        let samples = floatData[0]
+        return Data(bytes: samples, count: frameCount * MemoryLayout<Float>.size)
     }
 
     // MARK: - Built-in Microphone
