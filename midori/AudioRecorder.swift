@@ -12,7 +12,7 @@ import CoreAudio
 class AudioRecorder {
     private var engine: AVAudioEngine?
     private var buffers: [AVAudioPCMBuffer] = []
-    private let maxBuffers = 300  // ~10 seconds
+    private let maxBuffers = 54000  // ~30 minutes (safety valve only)
     private var builtInMicID: AudioDeviceID?
     private var isCurrentlyRecording = false
     private let recordingLock = NSLock()
