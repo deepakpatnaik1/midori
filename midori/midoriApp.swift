@@ -332,8 +332,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             result += "."
         }
 
-        // Add space after the sentence
-        result += " "
+        // Add non-breaking space after the sentence
+        // Using \u{00A0} because some apps (like Claude macOS) strip regular trailing spaces
+        result += "\u{00A0}"
 
         return result
     }
