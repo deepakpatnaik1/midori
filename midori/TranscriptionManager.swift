@@ -205,7 +205,9 @@ class TranscriptionManager {
         // Comparisons
         "only", "just", "even", "also",
         // Ordinal context
-        "number", "option", "choice", "item", "step", "phase", "part", "chapter", "section"
+        "number", "option", "choice", "item", "step", "phase", "part", "chapter", "section",
+        // Positional (the next one, the last one, the first one)
+        "next", "last", "first", "previous", "final", "same", "right", "wrong", "correct"
     ]
 
     // Words AFTER a number word that indicate it should stay as word
@@ -231,8 +233,15 @@ class TranscriptionManager {
             return false
         }
 
-        let beforeWord = index > 0 ? words[index - 1].lowercased().trimmingCharacters(in: .punctuationCharacters) : ""
         let afterWord = index < words.count - 1 ? words[index + 1].lowercased().trimmingCharacters(in: .punctuationCharacters) : ""
+
+        // Special case: "one" should almost always stay as word
+        // Only convert to "1" when part of a compound like "one hundred", "one thousand"
+        if value == 1 && !Self.multipliers.keys.contains(afterWord) {
+            return true
+        }
+
+        let beforeWord = index > 0 ? words[index - 1].lowercased().trimmingCharacters(in: .punctuationCharacters) : ""
 
         // Check context
         if Self.keepAsWordBeforeContext.contains(beforeWord) {
