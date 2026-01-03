@@ -416,6 +416,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func restart() {
         print("🔄 Restarting Midori...")
 
+        // Clean up current state
+        audioRecorder?.stopRecording()
+        audioRecorder = nil
+        waveformWindow?.hide()
+
+        // Reset state flags
+        stateQueue.sync {
+            isRecording = false
+            recordingStartTimer?.cancel()
+            recordingStartTimer = nil
+            engineStartTimer?.cancel()
+            engineStartTimer = nil
+        }
+
         guard let executableURL = Bundle.main.executableURL else {
             print("❌ Failed to get executable URL")
             showError("Unable to restart: Could not find executable path")
@@ -427,7 +441,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         do {
             try task.run()
-            NSApp.terminate(nil)
+            // Small delay to let new process start before terminating
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NSApp.terminate(nil)
+            }
         } catch {
             print("❌ Failed to restart: \(error.localizedDescription)")
             showError("Failed to restart: \(error.localizedDescription)")
