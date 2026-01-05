@@ -385,7 +385,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Midori needs microphone access to record your voice for transcription.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Midori needs speech recognition to transcribe your voice to text.";
@@ -421,7 +421,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Midori;
-				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Midori needs microphone access to record your voice for transcription.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Midori needs speech recognition to transcribe your voice to text.";

@@ -24,8 +24,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var keyMonitor: KeyMonitor?
     var audioRecorder: AudioRecorder?
     var waveformWindow: WaveformWindow?
+    var chatWindow: ChatWindow?
     var transcriptionManager: TranscriptionManager?
-    var trainingWindow: TrainingWindow?
     var aboutWindow: AboutWindow?
     var onboardingWindow: OnboardingWindow?
 
@@ -38,8 +38,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("✓ Midori launching...")
 
-        // Hide dock icon (LSUIElement handles this, but ensure no window appears)
-        NSApp.setActivationPolicy(.accessory)
+        // Regular app with Dock icon and Command-Tab presence
+        NSApp.setActivationPolicy(.regular)
 
         // Prompt for Accessibility permission (required for text injection)
         // This shows the system dialog and adds app to System Settings automatically
@@ -47,14 +47,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let accessibilityEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
         print("✓ Accessibility permission: \(accessibilityEnabled ? "granted" : "needs approval")")
 
+        // Check for API key - required for Grok integration via OpenRouter
+        if !KeychainHelper.shared.hasAPIKey() {
+            print("⚠️ No API key found - showing setup dialog")
+            if !showAPIKeyDialog(isFirstRun: true) {
+                // User cancelled - quit the app
+                print("❌ API key required - quitting")
+                NSApp.terminate(nil)
+                return
+            }
+        }
+        print("✓ API key configured")
+
         // Create menu bar status item
         setupMenuBar()
 
         // Initialize managers
         audioRecorder = AudioRecorder()
         waveformWindow = WaveformWindow()
-        trainingWindow = TrainingWindow(audioRecorder: audioRecorder, transcriptionManager: transcriptionManager)
+        chatWindow = ChatWindow()
         aboutWindow = AboutWindow()
+
+        // Setup chat window callbacks
+        setupChatCallbacks()
 
         // Setup audio recorder callback
         audioRecorder?.onAudioLevelUpdate = { [weak self] level in
@@ -103,6 +118,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func initializeTranscriptionManager() {
         transcriptionManager = TranscriptionManager()
 
+        // Setup transcription result callbacks (routing between text injection and chat)
+        setupTranscriptionCallbacks()
+
         // Setup completion callback
         transcriptionManager?.onInitializationComplete = { [weak self] result in
             guard let self = self else { return }
@@ -130,8 +148,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Update training window with transcription manager
-        trainingWindow = TrainingWindow(audioRecorder: audioRecorder, transcriptionManager: transcriptionManager)
     }
 
     private func setupMenuBar() {
@@ -145,8 +161,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Midori - Voice to Text", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
 
-        // Add Custom Dictionary menu item
-        menu.addItem(NSMenuItem(title: "Custom Dictionary...", action: #selector(showTraining), keyEquivalent: "d"))
+        // Show Chat menu item
+        menu.addItem(NSMenuItem(title: "Show Chat", action: #selector(showChat), keyEquivalent: "m"))
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Add API Key menu item
+        menu.addItem(NSMenuItem(title: "Set API Key...", action: #selector(showAPIKeySettings), keyEquivalent: "k"))
 
         // Add About menu item
         menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
@@ -289,30 +310,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Stop recording
             self.audioRecorder?.stopRecording()
 
-            // Hide waveform
-            self.waveformWindow?.hide()
+            // Show processing indicator (pulsing dots) while transcribing
+            self.waveformWindow?.showPulsingDots()
 
             // Get audio data and transcribe
             if let audioData = self.audioRecorder?.getAudioData() {
                 print("📝 Transcribing \(audioData.count) bytes of audio...")
                 self.transcriptionManager?.transcribe(audioData: audioData) { [weak self] result in
-                    DispatchQueue.main.async {
-                        switch result {
-                        case .success(let text):
-                            print("✓ Transcription complete: \(text.count) chars, text: \"\(text)\"")
-                            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                print("⚠️ Empty transcription - nothing to inject")
-                                return
-                            }
-                            self?.injectText(text)
-                        case .failure(let error):
-                            print("❌ Transcription failed: \(error.localizedDescription)")
-                            // Silent failure - no dialog box, just log it
+                    // The onTranscriptionResult callback handles routing
+                    // This completion just logs errors and hides dots on failure
+                    if case .failure(let error) = result {
+                        print("❌ Transcription failed: \(error.localizedDescription)")
+                        DispatchQueue.main.async {
+                            self?.waveformWindow?.hidePulsingDots()
                         }
                     }
                 }
             } else {
                 print("⚠️ No audio data captured")
+                self.waveformWindow?.hidePulsingDots()
             }
         }
     }
@@ -394,6 +410,76 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("✓ Text injected via Cmd+V")
     }
 
+    // MARK: - Chat and Transcription Callbacks
+
+    private func setupChatCallbacks() {
+        // When user sends a message via keyboard in chat window
+        chatWindow?.onSendMessage = { [weak self] message in
+            self?.handleChatMessage(message)
+        }
+    }
+
+    private func setupTranscriptionCallbacks() {
+        // Route transcription results to appropriate handler
+        transcriptionManager?.onTranscriptionResult = { [weak self] result in
+            guard let self = self else { return }
+
+            // Hide processing indicator now that transcription is complete
+            self.waveformWindow?.hidePulsingDots()
+
+            switch result {
+            case .textToInject(let text):
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+
+                if self.chatWindow?.isVisible ?? false {
+                    // Chat window is open - append voice input to existing text
+                    let currentText = self.chatWindow?.state.inputText ?? ""
+                    if !currentText.isEmpty {
+                        self.chatWindow?.state.inputText = currentText + " " + trimmed
+                    } else {
+                        self.chatWindow?.state.inputText = trimmed
+                    }
+                } else {
+                    // Chat window closed - inject at cursor in other apps
+                    self.injectText(text)
+                }
+
+            case .directAddress(let message):
+                // User said "Midori, ..." - open chat window with draft for review
+                self.chatWindow?.show(withDraft: message)
+            }
+        }
+    }
+
+    private func handleChatMessage(_ message: String) {
+        // Get all conversation history from superjournal
+        let history = DatabaseManager.shared.getAllTurns()
+            .map { (user: $0.user, assistant: $0.assistant) }
+
+        // Call Grok for response
+        Task {
+            do {
+                let response = try await HaikuClient.shared.chat(message: message, history: history)
+
+                // Update chat window on main thread
+                await MainActor.run {
+                    self.chatWindow?.addResponse(response)
+                }
+
+                // Save to superjournal
+                DatabaseManager.shared.addTurn(userMessage: message, assistantMessage: response)
+
+            } catch {
+                print("❌ Chat failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.chatWindow?.addResponse("Sorry, I couldn't respond right now. Please try again.")
+                    self.chatWindow?.setLoading(false)
+                }
+            }
+        }
+    }
+
     private func showError(_ message: String) {
         let alert = NSAlert()
         alert.messageText = "Midori Error"
@@ -403,9 +489,70 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.runModal()
     }
 
-    @objc private func showTraining() {
-        print("📚 Showing Custom Dictionary window")
-        trainingWindow?.show()
+    /// Shows the API key input dialog
+    /// - Parameter isFirstRun: If true, shows "Quit" button. If false, shows "Cancel" button.
+    /// - Returns: true if key was saved, false if user cancelled
+    @discardableResult
+    private func showAPIKeyDialog(isFirstRun: Bool) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "OpenRouter API Key Required"
+        alert.informativeText = "Enter your OpenRouter API key to enable Midori's AI features.\n\nGet your key at: openrouter.ai/keys"
+        alert.alertStyle = .informational
+
+        // Create text field for API key input
+        let inputField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        inputField.placeholderString = "sk-or-..."
+
+        // Pre-fill with existing key if updating
+        if let existingKey = KeychainHelper.shared.getAPIKey() {
+            inputField.stringValue = existingKey
+        }
+
+        alert.accessoryView = inputField
+
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: isFirstRun ? "Quit" : "Cancel")
+
+        // Make the input field first responder
+        alert.window.initialFirstResponder = inputField
+
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn {
+            let apiKey = inputField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if apiKey.isEmpty {
+                showError("API key cannot be empty.")
+                return showAPIKeyDialog(isFirstRun: isFirstRun)
+            }
+
+            // Basic validation - OpenRouter keys start with "sk-or-"
+            if !apiKey.hasPrefix("sk-or-") {
+                showError("Invalid API key format. OpenRouter keys start with 'sk-or-'.")
+                return showAPIKeyDialog(isFirstRun: isFirstRun)
+            }
+
+            do {
+                try KeychainHelper.shared.saveAPIKey(apiKey)
+                print("✓ API key saved successfully")
+                return true
+            } catch {
+                showError("Failed to save API key: \(error.localizedDescription)")
+                return false
+            }
+        }
+
+        return false
+    }
+
+    @objc private func showAPIKeySettings() {
+        print("🔑 Showing API Key settings")
+        showAPIKeyDialog(isFirstRun: false)
+    }
+
+    @objc private func showChat() {
+        print("💬 Showing Chat window")
+        chatWindow?.show(withDraft: "")
     }
 
     @objc private func showAbout() {

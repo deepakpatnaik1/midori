@@ -134,32 +134,34 @@ struct WaveformView: View {
 }
 
 struct PulsingDotsView: View {
-    @State private var scale: CGFloat = 1.0
+    @State private var activeIndex = 0
+
+    // Same gradient colors as waveform
+    let dotColors: [Color] = [
+        Color(red: 1.0, green: 0.0, blue: 1.0),     // Magenta
+        Color(red: 0.5, green: 0.4, blue: 1.0),     // Purple
+        Color(red: 0.0, green: 1.0, blue: 1.0)      // Cyan
+    ]
 
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<3, id: \.self) { _ in
+        HStack(spacing: 6) {
+            ForEach(0..<3, id: \.self) { index in
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(red: 1.0, green: 0.0, blue: 1.0),
-                                Color(red: 0.58, green: 0.29, blue: 0.82),
-                                Color(red: 0.29, green: 0.71, blue: 0.91),
-                                Color(red: 0.0, green: 1.0, blue: 1.0)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .fill(dotColors[index])
                     .frame(width: 10, height: 10)
+                    .scaleEffect(activeIndex == index ? 1.4 : 0.8)
+                    .opacity(activeIndex == index ? 1.0 : 0.4)
+                    .animation(.easeInOut(duration: 0.3), value: activeIndex)
             }
         }
-        .scaleEffect(scale)
         .onAppear {
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                scale = 1.3
-            }
+            startThinkingAnimation()
+        }
+    }
+
+    private func startThinkingAnimation() {
+        Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
+            activeIndex = (activeIndex + 1) % 3
         }
     }
 }

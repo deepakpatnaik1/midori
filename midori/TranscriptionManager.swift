@@ -32,10 +32,19 @@ enum TranscriptionError: Error {
     }
 }
 
+/// Result of transcription processing
+enum TranscriptionResult {
+    case textToInject(String)           // Normal transcription - inject at cursor
+    case directAddress(String)          // "Midori, ..." detected - route to chat
+}
+
 class TranscriptionManager {
     private var asrManager: AsrManager?
     private var isInitialized = false
     var onInitializationComplete: ((Result<Void, Error>) -> Void)?
+
+    /// Callback for transcription results (replaces simple completion)
+    var onTranscriptionResult: ((TranscriptionResult) -> Void)?
 
     init() {
         print("✓ TranscriptionManager initialized")
@@ -125,16 +134,40 @@ class TranscriptionManager {
             print("✓ Parakeet transcription complete: \(result.text.count) chars")
             print("🔍 Raw Parakeet output: \"\(result.text)\"")
 
-            // Apply corrections
-            let correctedText = CorrectionLayer.shared.applyCorrections(to: result.text)
-            print("✓ Applied corrections")
-
             // Convert number words to digits (with context protection)
-            let withNumbers = self.convertNumberWords(in: correctedText)
+            let withNumbers = self.convertNumberWords(in: result.text)
             print("✓ Converted number words to digits")
 
-            DispatchQueue.main.async {
-                completion(.success(withNumbers))
+            // Apply Haiku correction
+            let correctedText: String
+            do {
+                // Get all context from superjournal for vocabulary hints
+                let recentTurns = DatabaseManager.shared.getAllTurns()
+                let context = recentTurns.map { (user: $0.user, assistant: $0.assistant) }
+
+                print("🤖 Sending to Grok for correction...")
+                correctedText = try await HaikuClient.shared.correct(text: withNumbers, recentContext: context)
+                print("✓ Grok correction complete: \"\(correctedText)\"")
+            } catch {
+                print("⚠️ Grok correction failed: \(error.localizedDescription) - using raw transcription")
+                correctedText = withNumbers
+            }
+
+            // Check for direct address ("Midori, ...")
+            let lowercased = correctedText.lowercased()
+            if lowercased.hasPrefix("midori,") || lowercased.hasPrefix("midori ") {
+                // Keep the full message including "Midori" so she sees how Boss addressed her
+                print("💬 Direct address detected - routing to chat: \"\(correctedText)\"")
+                DispatchQueue.main.async { [weak self] in
+                    self?.onTranscriptionResult?(.directAddress(correctedText))
+                    completion(.success(correctedText))
+                }
+            } else {
+                // Normal transcription - inject at cursor
+                DispatchQueue.main.async { [weak self] in
+                    self?.onTranscriptionResult?(.textToInject(correctedText))
+                    completion(.success(correctedText))
+                }
             }
         } catch {
             print("❌ Transcription failed: \(error.localizedDescription)")
