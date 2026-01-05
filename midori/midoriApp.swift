@@ -235,33 +235,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
-            // Play pop sounds
-            self.playPopSound()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.playPopSound()
-            }
-
-            // Show waveform window
+            // Show waveform window immediately (visual feedback)
             self.waveformWindow?.show()
 
-            // Delay audio recording start until after pops complete (0.3s)
-            // This prevents AVAudioEngine from interfering with sound playback
-            let engineStartWork = DispatchWorkItem { [weak self] in
+            // Start audio engine FIRST, then play pops after warm-up
+            // This ensures Bluetooth devices (AirPods) are fully ready when pops play
+            self.audioRecorder?.startRecording()
+            print("✅ Audio engine started (warming up)")
+
+            // Wait for engine + Bluetooth to warm up, then play pops as "ready" signal
+            let popWork = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
-                // Only start if still in recording state (user didn't release key early)
+                // Only play pops if still in recording state
                 self.stateQueue.async {
                     guard self.isRecording else {
-                        print("⚠️ Recording cancelled before engine started")
+                        print("⚠️ Recording cancelled before pops")
                         return
                     }
                     DispatchQueue.main.async {
-                        self.audioRecorder?.startRecording()
-                        print("✅ Audio engine started (after pop sounds)")
+                        self.playPopSound()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                            self?.playPopSound()
+                        }
+                        print("✅ Pop sounds played (ready to capture)")
                     }
                 }
             }
-            self.engineStartTimer = engineStartWork
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.30, execute: engineStartWork)
+            self.engineStartTimer = popWork
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.50, execute: popWork)
         }
     }
 
@@ -332,9 +333,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             result += "."
         }
 
-        // Add non-breaking space after the sentence
-        // Using \u{00A0} because some apps (like Claude macOS) strip regular trailing spaces
-        result += "\u{00A0}"
+        // Add trailing space after the sentence (for continuous dictation)
+        result += " "
 
         return result
     }
