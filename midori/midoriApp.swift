@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Bulletproof state management
     private var isRecording = false
+    private var isTranscribing = false  // True while waiting for Parakeet + Grok
     private var recordingStartTimer: DispatchWorkItem?
     private var engineStartTimer: DispatchWorkItem?  // Delays engine start until after pop sounds
     private let stateQueue = DispatchQueue(label: "com.midori.stateQueue")
@@ -80,6 +81,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyMonitor = KeyMonitor()
         keyMonitor?.onRightCommandPressed = { [weak self] isPressed in
             self?.handleRightCommandKey(isPressed: isPressed)
+        }
+        keyMonitor?.onEscapePressed = { [weak self] in
+            self?.handleEscapeKey()
         }
 
         // Check if model has been downloaded before
@@ -186,6 +190,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             print("🔴 Right Command released - Initiating stop...")
             initiateStop()
+        }
+    }
+
+    private func handleEscapeKey() {
+        stateQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Only cancel if we're transcribing (pulsing dots visible)
+            guard self.isTranscribing else { return }
+
+            print("⎋ Cancelling transcription...")
+            self.isTranscribing = false
+
+            DispatchQueue.main.async {
+                self.waveformWindow?.hidePulsingDots()
+                print("✓ Transcription cancelled")
+            }
         }
     }
 
@@ -316,13 +337,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Get audio data and transcribe
             if let audioData = self.audioRecorder?.getAudioData() {
                 print("📝 Transcribing \(audioData.count) bytes of audio...")
+
+                // Mark transcription in progress (can be cancelled with Escape)
+                self.stateQueue.async {
+                    self.isTranscribing = true
+                }
+
                 self.transcriptionManager?.transcribe(audioData: audioData) { [weak self] result in
+                    guard let self = self else { return }
+
+                    // Check if transcription was cancelled
+                    var wasCancelled = false
+                    self.stateQueue.sync {
+                        wasCancelled = !self.isTranscribing
+                    }
+
+                    if wasCancelled {
+                        print("⚠️ Transcription result ignored (cancelled by Escape)")
+                        return
+                    }
+
+                    // Mark transcription complete
+                    self.stateQueue.async {
+                        self.isTranscribing = false
+                    }
+
                     // The onTranscriptionResult callback handles routing
                     // This completion just logs errors and hides dots on failure
                     if case .failure(let error) = result {
                         print("❌ Transcription failed: \(error.localizedDescription)")
                         DispatchQueue.main.async {
-                            self?.waveformWindow?.hidePulsingDots()
+                            self.waveformWindow?.hidePulsingDots()
                         }
                     }
                 }
@@ -571,6 +616,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Reset state flags
         stateQueue.sync {
             isRecording = false
+            isTranscribing = false
             recordingStartTimer?.cancel()
             recordingStartTimer = nil
             engineStartTimer?.cancel()
