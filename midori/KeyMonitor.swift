@@ -2,7 +2,7 @@
 //  KeyMonitor.swift
 //  midori
 //
-//  Global key monitoring for Right Command key and Escape
+//  Global key monitoring for Right Command key
 //
 
 import AppKit
@@ -11,12 +11,9 @@ import Carbon
 class KeyMonitor {
     private var globalFlagsMonitor: Any?
     private var localFlagsMonitor: Any?
-    private var globalKeyMonitor: Any?
-    private var localKeyMonitor: Any?
     private var isRightCommandPressed = false
 
     var onRightCommandPressed: ((Bool) -> Void)?
-    var onEscapePressed: (() -> Void)?
 
     init() {
         setupMonitors()
@@ -38,18 +35,7 @@ class KeyMonitor {
             return event
         }
 
-        // Global monitor for Escape key
-        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyDown(event)
-        }
-
-        // Local monitor for Escape key
-        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyDown(event)
-            return event
-        }
-
-        print("✓ Key monitor initialized - watching for Right Command and Escape keys")
+        print("✓ Key monitor initialized - watching for Right Command key")
     }
 
     private func handleFlagsChanged(_ event: NSEvent) {
@@ -70,25 +56,11 @@ class KeyMonitor {
         }
     }
 
-    private func handleKeyDown(_ event: NSEvent) {
-        // Escape key has keyCode 53
-        if event.keyCode == 53 {
-            print("⎋ Escape key pressed")
-            onEscapePressed?()
-        }
-    }
-
     private func stopMonitoring() {
         if let monitor = globalFlagsMonitor {
             NSEvent.removeMonitor(monitor)
         }
         if let monitor = localFlagsMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        if let monitor = globalKeyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }
         print("✓ Key monitor stopped")

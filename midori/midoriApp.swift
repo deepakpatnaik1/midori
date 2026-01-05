@@ -31,7 +31,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Bulletproof state management
     private var isRecording = false
-    private var isTranscribing = false  // True while waiting for Parakeet + Grok
     private var recordingStartTimer: DispatchWorkItem?
     private var engineStartTimer: DispatchWorkItem?  // Delays engine start until after pop sounds
     private let stateQueue = DispatchQueue(label: "com.midori.stateQueue")
@@ -81,9 +80,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyMonitor = KeyMonitor()
         keyMonitor?.onRightCommandPressed = { [weak self] isPressed in
             self?.handleRightCommandKey(isPressed: isPressed)
-        }
-        keyMonitor?.onEscapePressed = { [weak self] in
-            self?.handleEscapeKey()
         }
 
         // Check if model has been downloaded before
@@ -165,20 +161,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Midori - Voice to Text", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
 
-        // Show Chat menu item
-        menu.addItem(NSMenuItem(title: "Show Chat", action: #selector(showChat), keyEquivalent: "m"))
-
+        menu.addItem(NSMenuItem(title: "Show Chat", action: #selector(showChat), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
 
-        // Add API Key menu item
-        menu.addItem(NSMenuItem(title: "Set API Key...", action: #selector(showAPIKeySettings), keyEquivalent: "k"))
-
-        // Add About menu item
+        menu.addItem(NSMenuItem(title: "Set API Key...", action: #selector(showAPIKeySettings), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
-
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Restart", action: #selector(restart), keyEquivalent: "r"))
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
+
+        menu.addItem(NSMenuItem(title: "Restart", action: #selector(restart), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: ""))
 
         statusItem?.menu = menu
     }
@@ -190,23 +181,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             print("🔴 Right Command released - Initiating stop...")
             initiateStop()
-        }
-    }
-
-    private func handleEscapeKey() {
-        stateQueue.async { [weak self] in
-            guard let self = self else { return }
-
-            // Only cancel if we're transcribing (pulsing dots visible)
-            guard self.isTranscribing else { return }
-
-            print("⎋ Cancelling transcription...")
-            self.isTranscribing = false
-
-            DispatchQueue.main.async {
-                self.waveformWindow?.hidePulsingDots()
-                print("✓ Transcription cancelled")
-            }
         }
     }
 
@@ -338,29 +312,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let audioData = self.audioRecorder?.getAudioData() {
                 print("📝 Transcribing \(audioData.count) bytes of audio...")
 
-                // Mark transcription in progress (can be cancelled with Escape)
-                self.stateQueue.async {
-                    self.isTranscribing = true
-                }
-
                 self.transcriptionManager?.transcribe(audioData: audioData) { [weak self] result in
                     guard let self = self else { return }
-
-                    // Check if transcription was cancelled
-                    var wasCancelled = false
-                    self.stateQueue.sync {
-                        wasCancelled = !self.isTranscribing
-                    }
-
-                    if wasCancelled {
-                        print("⚠️ Transcription result ignored (cancelled by Escape)")
-                        return
-                    }
-
-                    // Mark transcription complete
-                    self.stateQueue.async {
-                        self.isTranscribing = false
-                    }
 
                     // The onTranscriptionResult callback handles routing
                     // This completion just logs errors and hides dots on failure
@@ -376,6 +329,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.waveformWindow?.hidePulsingDots()
             }
         }
+    }
+
+    private func fixDashSpacing(_ text: String) -> String {
+        // Add spaces around dashes unless they're part of compound words
+        // Compound words have letters directly on both sides (e.g., "well-known")
+        let dashes: [Character] = ["-", "–", "—"]
+        let chars = Array(text)
+        var newChars: [Character] = []
+
+        for i in 0..<chars.count {
+            let char = chars[i]
+
+            if dashes.contains(char) {
+                let prevIsLetter = i > 0 && chars[i-1].isLetter
+                let nextIsLetter = i < chars.count - 1 && chars[i+1].isLetter
+
+                // If both sides are letters, it's a compound word - leave it alone
+                if prevIsLetter && nextIsLetter {
+                    newChars.append(char)
+                } else {
+                    // Add space before if needed
+                    if !newChars.isEmpty && newChars.last != " " {
+                        newChars.append(" ")
+                    }
+                    newChars.append(char)
+                    // Add space after if needed
+                    if i < chars.count - 1 && chars[i+1] != " " {
+                        newChars.append(" ")
+                    }
+                }
+            } else {
+                newChars.append(char)
+            }
+        }
+
+        // Clean up any double spaces
+        var result = String(newChars)
+        while result.contains("  ") {
+            result = result.replacingOccurrences(of: "  ", with: " ")
+        }
+
+        return result
     }
 
     private func applySentenceCase(_ text: String) -> String {
@@ -411,8 +406,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Apply sentence case formatting: capitalize first letter, add period and space
-        let formattedText = applySentenceCase(text)
+        // Fix dash spacing and apply sentence case formatting
+        let dashFixed = fixDashSpacing(text)
+        let formattedText = applySentenceCase(dashFixed)
 
         print("📋 Setting pasteboard: [REDACTED - \(formattedText.count) characters]")
 
@@ -453,6 +449,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         print("✓ Text injected via Cmd+V")
+
+        // Auto-submit: simulate Enter keypress after paste
+        usleep(50000) // 50ms delay before Enter
+
+        if let enterDown = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: true) {
+            enterDown.post(tap: .cghidEventTap)
+            usleep(30000) // 30ms
+            if let enterUp = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: false) {
+                enterUp.post(tap: .cghidEventTap)
+            }
+            print("⏎ Auto-submitted with Enter")
+        }
     }
 
     // MARK: - Chat and Transcription Callbacks
@@ -612,35 +620,56 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioRecorder?.stopRecording()
         audioRecorder = nil
         waveformWindow?.hide()
+        chatWindow?.hide()
 
         // Reset state flags
         stateQueue.sync {
             isRecording = false
-            isTranscribing = false
             recordingStartTimer?.cancel()
             recordingStartTimer = nil
             engineStartTimer?.cancel()
             engineStartTimer = nil
         }
 
-        guard let executableURL = Bundle.main.executableURL else {
-            print("❌ Failed to get executable URL")
-            showError("Unable to restart: Could not find executable path")
+        guard let appURL = Bundle.main.bundleURL as URL? else {
+            print("❌ Failed to get app bundle URL")
+            showError("Unable to restart: Could not find app bundle")
             return
         }
 
-        let task = Process()
-        task.executableURL = executableURL
+        // Use NSWorkspace to launch new instance (proper macOS API)
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
 
-        do {
-            try task.run()
-            // Small delay to let new process start before terminating
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NSApp.terminate(nil)
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { runningApp, error in
+            if let error = error {
+                print("❌ Failed to launch new instance: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.showError("Failed to restart: \(error.localizedDescription)")
+                }
+                return
             }
-        } catch {
-            print("❌ Failed to restart: \(error.localizedDescription)")
-            showError("Failed to restart: \(error.localizedDescription)")
+
+            guard let newApp = runningApp else {
+                print("❌ New instance launched but no running app returned")
+                DispatchQueue.main.async {
+                    self.showError("Failed to restart: New instance not found")
+                }
+                return
+            }
+
+            print("✓ New instance launched (PID: \(newApp.processIdentifier))")
+
+            // Verify new instance is actually running before terminating
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if newApp.isTerminated {
+                    print("❌ New instance crashed immediately")
+                    self.showError("Restart failed: New instance crashed. Check Console for errors.")
+                } else {
+                    print("✓ New instance healthy - terminating old instance")
+                    NSApp.terminate(nil)
+                }
+            }
         }
     }
 
