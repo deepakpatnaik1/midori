@@ -395,7 +395,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
 
-    private func injectText(_ text: String) {
+    private func injectText(_ text: String, autoSubmit: Bool = true) {
         // Check accessibility permissions
         let trusted = AXIsProcessTrusted()
 
@@ -450,16 +450,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         print("✓ Text injected via Cmd+V")
 
-        // Auto-submit: simulate Enter keypress after paste
-        usleep(50000) // 50ms delay before Enter
+        // Auto-submit: simulate Enter keypress after paste (unless escape hatch)
+        if autoSubmit {
+            usleep(50000) // 50ms delay before Enter
 
-        if let enterDown = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: true) {
-            enterDown.post(tap: .cghidEventTap)
-            usleep(30000) // 30ms
-            if let enterUp = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: false) {
-                enterUp.post(tap: .cghidEventTap)
+            if let enterDown = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: true) {
+                enterDown.post(tap: .cghidEventTap)
+                usleep(30000) // 30ms
+                if let enterUp = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: false) {
+                    enterUp.post(tap: .cghidEventTap)
+                }
+                print("⏎ Auto-submitted with Enter")
             }
-            print("⏎ Auto-submitted with Enter")
+        } else {
+            print("⏸️ Review mode - skipping Enter (text ready for editing)")
         }
     }
 
@@ -494,12 +498,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self.chatWindow?.state.inputText = trimmed
                     }
                 } else {
-                    // Chat window closed - inject at cursor in other apps
-                    self.injectText(text)
+                    // Chat window closed - inject at cursor in other apps (with Enter)
+                    self.injectText(text, autoSubmit: true)
+                }
+
+            case .reviewText(let text):
+                // Escape hatch - inject at cursor WITHOUT Enter (for editing)
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+
+                if self.chatWindow?.isVisible ?? false {
+                    // Chat window is open - append to input field
+                    let currentText = self.chatWindow?.state.inputText ?? ""
+                    if !currentText.isEmpty {
+                        self.chatWindow?.state.inputText = currentText + " " + trimmed
+                    } else {
+                        self.chatWindow?.state.inputText = trimmed
+                    }
+                } else {
+                    // Inject WITHOUT auto-submit - user can review and edit
+                    self.injectText(text, autoSubmit: false)
                 }
 
             case .directAddress(let message):
-                // User said "Midori, ..." - open chat window with draft for review
+                // User said "Midori, ..." at start - open chat window with draft for review
                 self.chatWindow?.show(withDraft: message)
             }
         }

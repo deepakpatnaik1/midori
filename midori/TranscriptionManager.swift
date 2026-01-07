@@ -34,8 +34,9 @@ enum TranscriptionError: Error {
 
 /// Result of transcription processing
 enum TranscriptionResult {
-    case textToInject(String)           // Normal transcription - inject at cursor
-    case directAddress(String)          // "Midori, ..." detected - route to chat
+    case textToInject(String)           // Normal transcription - inject at cursor + Enter
+    case directAddress(String)          // "Midori, ..." at start - route to chat
+    case reviewText(String)             // Escape hatch - inject at cursor, NO Enter
 }
 
 class TranscriptionManager {
@@ -153,7 +154,19 @@ class TranscriptionManager {
                 correctedText = withNumbers
             }
 
-            // Check for direct address ("Midori, ...")
+            // Check for [REVIEW] prefix (escape hatch - inject without Enter)
+            if correctedText.hasPrefix("[REVIEW]") {
+                let reviewText = String(correctedText.dropFirst("[REVIEW]".count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                print("⏸️ Review mode detected - injecting without Enter: \"\(reviewText)\"")
+                DispatchQueue.main.async { [weak self] in
+                    self?.onTranscriptionResult?(.reviewText(reviewText))
+                    completion(.success(reviewText))
+                }
+                return
+            }
+
+            // Check for direct address ("Midori, ..." at start)
             let lowercased = correctedText.lowercased()
             if lowercased.hasPrefix("midori,") || lowercased.hasPrefix("midori ") {
                 // Keep the full message including "Midori" so she sees how Boss addressed her
@@ -163,7 +176,7 @@ class TranscriptionManager {
                     completion(.success(correctedText))
                 }
             } else {
-                // Normal transcription - inject at cursor
+                // Normal transcription - inject at cursor + Enter
                 DispatchQueue.main.async { [weak self] in
                     self?.onTranscriptionResult?(.textToInject(correctedText))
                     completion(.success(correctedText))
