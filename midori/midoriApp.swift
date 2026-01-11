@@ -245,6 +245,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isRecording = true
         recordingStartTimer = nil  // Clear the timer reference
 
+        // Reset escape hatch flag for new recording
+        keyMonitor?.resetEscapeHatch()
+
         print("✅ Recording started")
 
         // All UI and audio operations must happen on main thread
@@ -489,6 +492,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { return }
 
+                // Check if escape hatch was triggered (Left Command tap during recording)
+                let escapeHatchActive = self.keyMonitor?.isEscapeHatchActive() ?? false
+                if escapeHatchActive {
+                    print("⏸️ Escape hatch active - injecting without Enter")
+                }
+
                 if self.chatWindow?.isVisible ?? false {
                     // Chat window is open - append voice input to existing text
                     let currentText = self.chatWindow?.state.inputText ?? ""
@@ -498,8 +507,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self.chatWindow?.state.inputText = trimmed
                     }
                 } else {
-                    // Chat window closed - inject at cursor in other apps (with Enter)
-                    self.injectText(text, autoSubmit: true)
+                    // Chat window closed - inject at cursor in other apps
+                    // If escape hatch triggered, skip auto-Enter so user can review
+                    self.injectText(text, autoSubmit: !escapeHatchActive)
                 }
 
             case .reviewText(let text):

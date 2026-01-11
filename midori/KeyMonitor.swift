@@ -12,8 +12,20 @@ class KeyMonitor {
     private var globalFlagsMonitor: Any?
     private var localFlagsMonitor: Any?
     private var isRightCommandPressed = false
+    private var isLeftCommandPressed = false
+    private var escapeHatchTriggered = false
 
     var onRightCommandPressed: ((Bool) -> Void)?
+
+    /// Returns true if escape hatch was triggered during current recording
+    func isEscapeHatchActive() -> Bool {
+        return escapeHatchTriggered
+    }
+
+    /// Reset escape hatch flag (call when new recording starts)
+    func resetEscapeHatch() {
+        escapeHatchTriggered = false
+    }
 
     init() {
         setupMonitors()
@@ -39,11 +51,10 @@ class KeyMonitor {
     }
 
     private func handleFlagsChanged(_ event: NSEvent) {
-        // Right Command key has keyCode 54
         let isCommandPressed = event.modifierFlags.contains(.command)
         let keyCode = event.keyCode
 
-        // Check if it's specifically the Right Command key
+        // Right Command key (keyCode 54) - controls recording
         if keyCode == 54 {
             let newState = isCommandPressed
 
@@ -53,6 +64,19 @@ class KeyMonitor {
                 print("⌘ Right Command key: \(newState ? "DOWN" : "UP")")
                 onRightCommandPressed?(newState)
             }
+        }
+
+        // Left Command key (keyCode 55) - escape hatch trigger
+        if keyCode == 55 {
+            let newState = isCommandPressed
+
+            // Detect tap (key down) while Right Command is held
+            if newState && !isLeftCommandPressed && isRightCommandPressed {
+                escapeHatchTriggered = true
+                print("⌘ Left Command tapped - escape hatch triggered")
+            }
+
+            isLeftCommandPressed = newState
         }
     }
 
