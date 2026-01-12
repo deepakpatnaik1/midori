@@ -35,6 +35,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var engineStartTimer: DispatchWorkItem?  // Delays engine start until after pop sounds
     private let stateQueue = DispatchQueue(label: "com.midori.stateQueue")
 
+    // Auto-enter toggle (persisted)
+    private var autoEnterEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "autoEnterEnabled") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "autoEnterEnabled") }
+    }
+    private var autoEnterMenuItem: NSMenuItem?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("✓ Midori launching...")
 
@@ -162,6 +169,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         menu.addItem(NSMenuItem(title: "Show Chat", action: #selector(showChat), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+
+        // Auto-enter toggle
+        let autoEnterItem = NSMenuItem(title: "Auto-Enter", action: #selector(toggleAutoEnter), keyEquivalent: "")
+        autoEnterItem.state = autoEnterEnabled ? .on : .off
+        menu.addItem(autoEnterItem)
+        autoEnterMenuItem = autoEnterItem
         menu.addItem(NSMenuItem.separator())
 
         menu.addItem(NSMenuItem(title: "Set API Key...", action: #selector(showAPIKeySettings), keyEquivalent: ""))
@@ -499,7 +513,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 } else {
                     // Chat window closed - inject at cursor in other apps
-                    self.injectText(text, autoSubmit: true)
+                    self.injectText(text, autoSubmit: self.autoEnterEnabled)
                 }
 
             case .reviewText(let text):
@@ -623,6 +637,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showAPIKeySettings() {
         print("🔑 Showing API Key settings")
         showAPIKeyDialog(isFirstRun: false)
+    }
+
+    @objc private func toggleAutoEnter() {
+        autoEnterEnabled.toggle()
+        autoEnterMenuItem?.state = autoEnterEnabled ? .on : .off
+        print("⏎ Auto-Enter: \(autoEnterEnabled ? "ON" : "OFF")")
     }
 
     @objc private func showChat() {
