@@ -35,6 +35,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var engineStartTimer: DispatchWorkItem?  // Delays engine start until after pop sounds
     private let stateQueue = DispatchQueue(label: "com.midori.stateQueue")
 
+    // Keyboard escape hatch: Left Command tap while Right Command held → review mode
+    private var keyboardEscapeHatch = false
+
     // Auto-enter toggle (persisted)
     private var autoEnterEnabled: Bool {
         get { UserDefaults.standard.object(forKey: "autoEnterEnabled") as? Bool ?? true }
@@ -87,6 +90,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyMonitor = KeyMonitor()
         keyMonitor?.onRightCommandPressed = { [weak self] isPressed in
             self?.handleRightCommandKey(isPressed: isPressed)
+        }
+        keyMonitor?.onLeftCommandTapped = { [weak self] in
+            self?.handleEscapeHatchTrigger()
         }
 
         // Check if model has been downloaded before
@@ -198,6 +204,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func handleEscapeHatchTrigger() {
+        stateQueue.async { [weak self] in
+            guard let self = self, self.isRecording else { return }
+
+            // Only trigger once per recording session
+            guard !self.keyboardEscapeHatch else {
+                print("⚠️ Escape hatch already active")
+                return
+            }
+
+            self.keyboardEscapeHatch = true
+            print("🛑 Keyboard escape hatch activated - text will appear for review")
+
+            // Audio feedback: single pop confirms escape hatch
+            DispatchQueue.main.async {
+                self.playPopSound()
+            }
+        }
+    }
+
     private func initiateRecording() {
         stateQueue.async { [weak self] in
             guard let self = self else { return }
@@ -258,6 +284,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         isRecording = true
         recordingStartTimer = nil  // Clear the timer reference
+        keyboardEscapeHatch = false  // Reset escape hatch for new recording
 
         print("✅ Recording started")
 
@@ -512,12 +539,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self.chatWindow?.state.inputText = trimmed
                     }
                 } else {
-                    // Chat window closed - inject at cursor in other apps
-                    self.injectText(text, autoSubmit: self.autoEnterEnabled)
+                    // Keyboard escape hatch overrides auto-enter setting
+                    let shouldAutoSubmit = self.keyboardEscapeHatch ? false : self.autoEnterEnabled
+                    self.keyboardEscapeHatch = false  // Reset flag after use
+                    self.injectText(text, autoSubmit: shouldAutoSubmit)
                 }
 
             case .reviewText(let text):
-                // Escape hatch - inject at cursor WITHOUT Enter (for editing)
+                // Escape hatch (voice-triggered via Grok) - inject at cursor WITHOUT Enter
+                self.keyboardEscapeHatch = false  // Reset flag
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { return }
 
@@ -536,6 +566,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             case .directAddress(let message):
                 // User said "Midori, ..." at start - open chat window with draft for review
+                self.keyboardEscapeHatch = false  // Reset flag
                 self.chatWindow?.show(withDraft: message)
             }
         }

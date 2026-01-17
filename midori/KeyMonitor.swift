@@ -15,6 +15,9 @@ class KeyMonitor {
 
     var onRightCommandPressed: ((Bool) -> Void)?
 
+    /// Called when Left Command is tapped while Right Command is held (escape hatch trigger)
+    var onLeftCommandTapped: (() -> Void)?
+
     init() {
         setupMonitors()
     }
@@ -52,6 +55,12 @@ class KeyMonitor {
                 print("⌘ Right Command key: \(newState ? "DOWN" : "UP")")
                 onRightCommandPressed?(newState)
             }
+        }
+
+        // Left Command key (keyCode 55) - escape hatch when Right Command is held
+        if keyCode == 55 && isCommandPressed && isRightCommandPressed {
+            print("⌘ Left Command tapped while recording - escape hatch triggered")
+            onLeftCommandTapped?()
         }
     }
 
